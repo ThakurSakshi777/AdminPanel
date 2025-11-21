@@ -1,20 +1,109 @@
-import { Search, Plus, Edit, Trash2, UserCircle, Mail, Shield } from 'lucide-react';
+import { useState } from 'react';
+import { Search, Plus, Edit, Trash2, X } from 'lucide-react';
 
 const Users = () => {
-  const users = [
+  const [users, setUsers] = useState([
     { id: 1, name: 'Rahul Sharma', email: 'rahul@example.com', role: 'Customer', status: 'Active', phone: '+91 98765 43210', joined: 'Jan 2024' },
     { id: 2, name: 'Priya Patel', email: 'priya@example.com', role: 'Agent', status: 'Active', phone: '+91 98765 43211', joined: 'Feb 2024' },
     { id: 3, name: 'Amit Kumar', email: 'amit@example.com', role: 'Customer', status: 'Inactive', phone: '+91 98765 43212', joined: 'Mar 2024' },
     { id: 4, name: 'Sneha Desai', email: 'sneha@example.com', role: 'Agent', status: 'Active', phone: '+91 98765 43213', joined: 'Apr 2024' },
     { id: 5, name: 'Vikram Singh', email: 'vikram@example.com', role: 'Customer', status: 'Active', phone: '+91 98765 43214', joined: 'May 2024' },
-  ];
+  ]);
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    role: 'Customer',
+    status: 'Active'
+  });
 
   const stats = [
-    { label: 'Total Users', value: '1,234', change: '+12%', color: '#0d9488' },
-    { label: 'Active Users', value: '856', change: '+8%', color: '#14b8a6' },
-    { label: 'Agents', value: '124', change: '+5%', color: '#2dd4bf' },
-    { label: 'Customers', value: '1,110', change: '+15%', color: '#5eead4' },
+    { label: 'Total Users', value: users.length.toString(), change: '+12%', color: '#0d9488' },
+    { label: 'Active Users', value: users.filter(u => u.status === 'Active').length.toString(), change: '+8%', color: '#14b8a6' },
+    { label: 'Agents', value: users.filter(u => u.role === 'Agent').length.toString(), change: '+5%', color: '#2dd4bf' },
+    { label: 'Customers', value: users.filter(u => u.role === 'Customer').length.toString(), change: '+15%', color: '#5eead4' },
   ];
+
+  const handleOpenModal = (user = null) => {
+    if (user) {
+      setEditingUser(user);
+      setFormData({
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        status: user.status
+      });
+    } else {
+      setEditingUser(null);
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        role: 'Customer',
+        status: 'Active'
+      });
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingUser(null);
+    setFormData({
+      name: '',
+      email: '',
+      phone: '',
+      role: 'Customer',
+      status: 'Active'
+    });
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    
+    if (editingUser) {
+      // Update existing user
+      setUsers(prev => prev.map(user => 
+        user.id === editingUser.id 
+          ? { ...user, ...formData }
+          : user
+      ));
+    } else {
+      // Add new user
+      const newUser = {
+        id: users.length + 1,
+        ...formData,
+        joined: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      };
+      setUsers(prev => [...prev, newUser]);
+    }
+    
+    handleCloseModal();
+  };
+
+  const handleDeleteUser = (userId) => {
+    if (window.confirm('Are you sure you want to delete this user?')) {
+      setUsers(prev => prev.filter(user => user.id !== userId));
+    }
+  };
+
+  const filteredUsers = users.filter(user =>
+    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="page-container">
@@ -23,7 +112,7 @@ const Users = () => {
           <h2>Users Management</h2>
           <p className="subtitle">Manage customers and agents</p>
         </div>
-        <button className="btn-primary-modern">
+        <button className="btn-primary-modern" onClick={() => handleOpenModal()}>
           <Plus size={18} />
           Add New User
         </button>
@@ -41,7 +130,12 @@ const Users = () => {
 
       <div className="search-bar-modern">
         <Search size={20} />
-        <input type="text" placeholder="Search users by name or email..." />
+        <input 
+          type="text" 
+          placeholder="Search users by name or email..." 
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
 
       <div className="table-container-modern">
@@ -57,7 +151,7 @@ const Users = () => {
             </tr>
           </thead>
           <tbody>
-            {users.map((user) => (
+            {filteredUsers.map((user) => (
               <tr key={user.id}>
                 <td>
                   <div className="user-cell">
@@ -81,8 +175,12 @@ const Users = () => {
                 </td>
                 <td>
                   <div className="action-buttons-modern">
-                    <button className="btn-icon-modern edit"><Edit size={16} /></button>
-                    <button className="btn-icon-modern delete"><Trash2 size={16} /></button>
+                    <button className="btn-icon-modern edit" onClick={() => handleOpenModal(user)}>
+                      <Edit size={16} />
+                    </button>
+                    <button className="btn-icon-modern delete" onClick={() => handleDeleteUser(user.id)}>
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -90,6 +188,100 @@ const Users = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Add/Edit User Modal */}
+      {isModalOpen && (
+        <div className="modal-overlay" onClick={handleCloseModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{editingUser ? 'Edit User' : 'Add New User'}</h3>
+              <button className="modal-close" onClick={handleCloseModal}>
+                <X size={20} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleSubmit} className="modal-form">
+              <div className="form-group">
+                <label htmlFor="name">Full Name *</label>
+                <input
+                  type="text"
+                  id="name"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  placeholder="Enter full name"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="email">Email Address *</label>
+                <input
+                  type="email"
+                  id="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  placeholder="Enter email address"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="phone">Phone Number *</label>
+                <input
+                  type="tel"
+                  id="phone"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleInputChange}
+                  placeholder="+91 98765 43210"
+                  required
+                />
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="role">Role *</label>
+                  <select
+                    id="role"
+                    name="role"
+                    value={formData.role}
+                    onChange={handleInputChange}
+                    required
+                  >
+                    <option value="Customer">Customer</option>
+                    <option value="Agent">Agent</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="status">Status *</label>
+                  <select
+                    id="status"
+                    name="status"
+                    value={formData.status}
+                    onChange={handleInputChange}
+                    required
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="modal-actions">
+                <button type="button" className="btn-cancel" onClick={handleCloseModal}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-submit">
+                  {editingUser ? 'Update User' : 'Add User'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

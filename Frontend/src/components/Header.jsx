@@ -2,6 +2,7 @@ import { Bell, User, LogOut, Search, Menu, Clock, X, Calendar, ChevronDown } fro
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useDateRange } from '../context/DateContext';
+import { logoutUser } from '../services/authService';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -392,8 +393,8 @@ const Header = ({ onMenuClick, isSidebarOpen }) => {
         return !prev;
       });
     } else if (item.action === 'logout') {
-      // Logout logic
-      localStorage.clear();
+      // Logout logic - clear token and redirect
+      logoutUser();
       navigate('/login');
     } else if (item.action === 'download-reports') {
       // Download functionality

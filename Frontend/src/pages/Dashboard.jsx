@@ -1,10 +1,12 @@
-import { Users, Building2, Mail, TrendingUp, ArrowUp, ArrowDown, Plus, Send, RefreshCw } from 'lucide-react';
+import { Users, Building2, Mail, TrendingUp, ArrowUp, ArrowDown } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useDateRange } from '../context/DateContext';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
   const { dateRange } = useDateRange();
+  const navigate = useNavigate();
   const [filteredData, setFilteredData] = useState({
     stats: {},
     chartData: [],
@@ -45,6 +47,11 @@ const Dashboard = () => {
     { id: 4, name: 'Sneha Desai', action: 'Maintenance Fee', amount: '- ₹ 15,000', date: 'Nov 19, 2024', status: 'Success', type: 'expense' },
   ];
 
+  // Navigate to cards page
+  const handleSeeAllCards = () => {
+    navigate('/properties'); // You can create a separate /cards route
+  };
+
   return (
     <div className="dashboard">
       {/* Balance Card */}
@@ -53,11 +60,6 @@ const Dashboard = () => {
           <p className="balance-label">Total Revenue</p>
           <h1 className="balance-amount">₹ 8,45,67,820</h1>
           <span className="balance-change positive">+15.8% ↑</span>
-        </div>
-        <div className="balance-actions">
-          <button className="btn-add"><Plus size={18} /> Add</button>
-          <button className="btn-action"><Send size={18} /> Send</button>
-          <button className="btn-action"><RefreshCw size={18} /> Request</button>
         </div>
       </div>
 
@@ -143,10 +145,6 @@ const Dashboard = () => {
         <div className="recent-activity-modern">
           <div className="section-header">
             <h3>⚡ Recent Activity</h3>
-            <div className="activity-controls">
-              <button className="filter-btn">☰ Filter</button>
-              <button className="filter-btn">↕ Sort</button>
-            </div>
           </div>
           <table className="activity-table">
             <thead>
@@ -182,7 +180,7 @@ const Dashboard = () => {
         <div className="featured-card-section">
           <div className="section-header">
             <h3>💳 My Cards</h3>
-            <a href="#" className="see-all">See All →</a>
+            <button onClick={handleSeeAllCards} className="see-all" style={{ background: 'none', border: 'none', cursor: 'pointer' }}>See All →</button>
           </div>
           <div className="property-card-modern">
             <div className="card-header-info">
