@@ -14,6 +14,13 @@ import {
 const Sidebar = ({ isOpen, onClose }) => {
   const location = useLocation();
 
+  const handleNavClick = () => {
+    // Check if mobile/tablet (screen width < 1024px)
+    if (window.innerWidth < 1024) {
+      onClose();
+    }
+  };
+
   const menuItems = [
     { path: '/', icon: Home, label: 'Dashboard', emoji: '🏠' },
     { path: '/users', icon: Users, label: 'Users', emoji: '👤' },
@@ -45,6 +52,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                 key={item.path}
                 to={item.path}
                 className={`nav-item ${isActive ? 'active' : ''}`}
+                onClick={handleNavClick}
               >
                 <span className="nav-emoji">{item.emoji}</span>
                 <span>{item.label}</span>
@@ -63,6 +71,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                 key={item.path}
                 to={item.path}
                 className={`nav-item ${isActive ? 'active' : ''}`}
+                onClick={handleNavClick}
               >
                 <span className="nav-emoji">{item.emoji}</span>
                 <span>{item.label}</span>
