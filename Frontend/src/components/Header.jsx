@@ -7,7 +7,7 @@ import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
-const Header = ({ onMenuClick }) => {
+const Header = ({ onMenuClick, isSidebarOpen }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { dateRange, setDateRange } = useDateRange();
@@ -605,8 +605,8 @@ const Header = ({ onMenuClick }) => {
   return (
     <header className={`header ${isMobile ? 'mobile' : ''} ${isTablet ? 'tablet' : ''}`}>
       <div className="header-left">
-        {/* Mobile Hamburger Menu */}
-        {isMobile && (
+        {/* Hamburger Menu - Show only when sidebar is closed */}
+        {!isSidebarOpen && (
           <button 
             className="hamburger-menu"
             onClick={onMenuClick}
@@ -618,7 +618,7 @@ const Header = ({ onMenuClick }) => {
         {/* Logo/Title for Mobile */}
         {isMobile && (
           <div className="mobile-logo">
-            <h2>Admin Panel</h2>
+            <h2>RentifyPro</h2>
           </div>
         )}
 

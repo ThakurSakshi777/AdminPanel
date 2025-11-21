@@ -4,15 +4,18 @@ import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 
 const MainLayout = () => {
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Desktop default: open
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
+      // Desktop pe sidebar by default open, mobile pe closed
       if (!mobile) {
-        setIsMobileSidebarOpen(false);
+        setIsSidebarOpen(true);
+      } else {
+        setIsSidebarOpen(false);
       }
     };
 
@@ -21,29 +24,23 @@ const MainLayout = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Listen for hamburger menu clicks from Header
-  useEffect(() => {
-    const handleMenuToggle = () => {
-      setIsMobileSidebarOpen(prev => !prev);
-    };
-
-    window.addEventListener('toggleMobileSidebar', handleMenuToggle);
-    return () => window.removeEventListener('toggleMobileSidebar', handleMenuToggle);
-  }, []);
+  const toggleSidebar = () => {
+    setIsSidebarOpen(prev => !prev);
+  };
 
   return (
-    <div className={`admin-layout ${isMobile ? 'mobile' : ''}`}>
+    <div className={`admin-layout ${isMobile ? 'mobile' : ''} ${!isSidebarOpen ? 'sidebar-closed' : ''}`}>
       {/* Mobile Sidebar Overlay */}
-      {isMobile && isMobileSidebarOpen && (
+      {isMobile && isSidebarOpen && (
         <div 
           className="sidebar-overlay"
-          onClick={() => setIsMobileSidebarOpen(false)}
+          onClick={() => setIsSidebarOpen(false)}
         ></div>
       )}
 
-      <Sidebar isOpen={isMobileSidebarOpen} onClose={() => setIsMobileSidebarOpen(false)} />
+      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
       <div className="main-content">
-        <Header onMenuClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)} />
+        <Header onMenuClick={toggleSidebar} isSidebarOpen={isSidebarOpen} />
         <div className="content-area">
           <Outlet />
         </div>

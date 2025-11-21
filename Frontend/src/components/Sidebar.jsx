@@ -27,14 +27,13 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   return (
     <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
-      {/* Mobile Close Button */}
-      <button className="sidebar-close-mobile" onClick={onClose}>
-        <X size={24} />
+      {/* Close Button - Desktop & Mobile */}
+      <button className="sidebar-close-btn" onClick={onClose}>
+        <X size={20} />
       </button>
 
       <div className="sidebar-header">
-        <h2>🏢 Sequence</h2>
-        <button className="menu-toggle">☰</button>
+        <h2>🏢 RentifyPro</h2>
       </div>
       <div className="sidebar-section">
         <p className="section-label">GENERAL</p>
