@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
+import { X } from 'lucide-react';
 import { 
   Home, 
   Users, 
@@ -10,7 +11,7 @@ import {
   Shield 
 } from 'lucide-react';
 
-const Sidebar = () => {
+const Sidebar = ({ isOpen, onClose }) => {
   const location = useLocation();
 
   const menuItems = [
@@ -25,7 +26,12 @@ const Sidebar = () => {
   ];
 
   return (
-    <div className="sidebar">
+    <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
+      {/* Mobile Close Button */}
+      <button className="sidebar-close-mobile" onClick={onClose}>
+        <X size={24} />
+      </button>
+
       <div className="sidebar-header">
         <h2>🏢 Sequence</h2>
         <button className="menu-toggle">☰</button>
@@ -82,7 +88,7 @@ const Sidebar = () => {
           </div>
         </div>
       </div>
-    </div>
+    </aside>
   );
 };
 

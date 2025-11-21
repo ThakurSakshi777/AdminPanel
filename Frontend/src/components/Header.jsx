@@ -1,10 +1,15 @@
 import { Bell, User, LogOut, Search, Menu, Clock, X, Calendar, ChevronDown } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useDateRange } from '../context/DateContext';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 
-const Header = () => {
+const Header = ({ onMenuClick }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { dateRange, setDateRange } = useDateRange();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -14,6 +19,22 @@ const Header = () => {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [isExportOpen, setIsExportOpen] = useState(false);
+  const [showExportSettings, setShowExportSettings] = useState(false);
+  const [exportSettings, setExportSettings] = useState({
+    format: 'pdf',
+    fileName: '',
+    dateRange: true,
+    selectedColumns: []
+  });
+  const [isMobile, setIsMobile] = useState(false);
+  const [isTablet, setIsTablet] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const saved = localStorage.getItem('darkMode');
+    return saved === 'true';
+  });
   const [notifications, setNotifications] = useState([
     {
       id: 1,
@@ -69,6 +90,53 @@ const Header = () => {
   const searchRef = useRef(null);
   const datePickerRef = useRef(null);
   const notificationRef = useRef(null);
+  const profileRef = useRef(null);
+  const exportRef = useRef(null);
+
+  // User data
+  const userData = {
+    name: 'Young Alaska',
+    email: 'alaska@gmail.com',
+    avatar: 'YA',
+    role: 'Admin'
+  };
+
+  // Profile menu items
+  const profileMenuItems = [
+    { icon: '📊', label: 'My Dashboard', link: '/' },
+    { icon: '👤', label: 'Profile Settings', link: '/profile' },
+    { icon: '🔐', label: 'Change Password', link: '/change-password' },
+    { icon: '⚙️', label: 'Account Settings', link: '/settings' },
+    { icon: '🌙', label: 'Dark Mode', action: 'toggle-dark-mode' },
+    { icon: '📥', label: 'Download Reports', action: 'download-reports' },
+    { icon: '❌', label: 'Logout', action: 'logout', danger: true }
+  ];
+
+  // Export options
+  const exportOptions = [
+    { icon: '📄', label: 'Export as PDF', format: 'pdf', description: 'Download as PDF document' },
+    { icon: '📊', label: 'Export as Excel', format: 'xlsx', description: 'Microsoft Excel format' },
+    { icon: '📑', label: 'Export as CSV', format: 'csv', description: 'Comma-separated values' },
+    { icon: '📋', label: 'Copy to Clipboard', format: 'clipboard', description: 'Copy data to clipboard' }
+  ];
+
+  // Current page detection
+  const currentPage = location.pathname.split('/')[1] || 'dashboard';
+
+  // Page-specific columns
+  const getPageColumns = () => {
+    const columnsMap = {
+      'dashboard': ['Date', 'Metric', 'Value', 'Change'],
+      'users': ['Name', 'Email', 'Role', 'Status', 'Joined Date'],
+      'properties': ['Property Name', 'Location', 'Price', 'Type', 'Status'],
+      'inquiries': ['Customer', 'Property', 'Date', 'Status', 'Priority'],
+      'complaints': ['Title', 'Category', 'Status', 'Priority', 'Date'],
+      'listings': ['Property', 'Agent', 'Price', 'Status', 'Date'],
+      'services': ['Service', 'Provider', 'Status', 'Cost', 'Date'],
+      'security': ['Event', 'User', 'Action', 'IP Address', 'Timestamp']
+    };
+    return columnsMap[currentPage] || [];
+  };
 
   // Notification types configuration
   const notificationTypes = {
@@ -120,6 +188,45 @@ const Header = () => {
     }
   }, []);
 
+  // Window resize detection for responsive behavior
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+      setIsTablet(window.innerWidth >= 768 && window.innerWidth < 1024);
+    };
+    
+    handleResize(); // Initial check
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Close mobile menu when screen size changes
+  useEffect(() => {
+    if (!isMobile) {
+      // Close all dropdowns when switching to desktop
+      setIsSearchOpen(false);
+      setIsDatePickerOpen(false);
+      setIsNotificationOpen(false);
+      setIsProfileOpen(false);
+      setIsExportOpen(false);
+    }
+  }, [isMobile]);
+
+  // Dark mode effect
+  useEffect(() => {
+    console.log('Dark Mode Changed:', isDarkMode);
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark-mode');
+      document.body.classList.add('dark-mode');
+      console.log('Dark mode classes added');
+    } else {
+      document.documentElement.classList.remove('dark-mode');
+      document.body.classList.remove('dark-mode');
+      console.log('Dark mode classes removed');
+    }
+    localStorage.setItem('darkMode', isDarkMode);
+  }, [isDarkMode]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -152,6 +259,13 @@ const Header = () => {
       }
       if (notificationRef.current && !notificationRef.current.contains(event.target)) {
         setIsNotificationOpen(false);
+      }
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
+        setIsProfileOpen(false);
+        setShowTooltip(false);
+      }
+      if (exportRef.current && !exportRef.current.contains(event.target)) {
+        setIsExportOpen(false);
       }
     };
 
@@ -266,6 +380,161 @@ const Header = () => {
     setIsNotificationOpen(false);
   };
 
+  // Handle profile menu item click
+  const handleMenuItemClick = (item) => {
+    if (item.link) {
+      navigate(item.link);
+    } else if (item.action === 'toggle-dark-mode') {
+      // Dark mode toggle
+      console.log('Toggle dark mode clicked, current state:', isDarkMode);
+      setIsDarkMode(prev => {
+        console.log('Changing from', prev, 'to', !prev);
+        return !prev;
+      });
+    } else if (item.action === 'logout') {
+      // Logout logic
+      localStorage.clear();
+      navigate('/login');
+    } else if (item.action === 'download-reports') {
+      // Download functionality
+      console.log('Downloading reports...');
+    }
+    setIsProfileOpen(false);
+  };
+
+  // Handle avatar click - navigate to profile
+  const handleAvatarClick = () => {
+    navigate('/profile');
+    setIsProfileOpen(false);
+  };
+
+  // Get current page data
+  const getCurrentPageData = () => {
+    const dataMap = {
+      'dashboard': [
+        { Date: '2024-11-21', Metric: 'Total Users', Value: '1,234', Change: '+12%' },
+        { Date: '2024-11-21', Metric: 'Properties', Value: '456', Change: '+8%' },
+        { Date: '2024-11-21', Metric: 'Inquiries', Value: '89', Change: '+15%' },
+        { Date: '2024-11-21', Metric: 'Revenue', Value: '₹45.2L', Change: '+23%' }
+      ],
+      'users': [
+        { Name: 'Rahul Sharma', Email: 'rahul@example.com', Role: 'Customer', Status: 'Active', 'Joined Date': '2024-01-15' },
+        { Name: 'Priya Patel', Email: 'priya@example.com', Role: 'Agent', Status: 'Active', 'Joined Date': '2024-02-20' }
+      ],
+      'properties': [
+        { 'Property Name': '3BHK Apartment', Location: 'Mumbai', Price: '₹1.2 Cr', Type: 'Apartment', Status: 'Available' },
+        { 'Property Name': 'Villa with Garden', Location: 'Bangalore', Price: '₹2.5 Cr', Type: 'Villa', Status: 'Sold' }
+      ]
+    };
+    return dataMap[currentPage] || [];
+  };
+
+  // Export to PDF
+  const exportToPDF = (data, fileName, columns) => {
+    const doc = new jsPDF();
+    
+    doc.setFontSize(18);
+    doc.text(`${currentPage.toUpperCase()} Report`, 14, 20);
+    doc.setFontSize(11);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 30);
+    
+    if (exportSettings.dateRange) {
+      doc.text(`Date Range: ${formatDate(dateRange.startDate)} - ${formatDate(dateRange.endDate)}`, 14, 38);
+    }
+    
+    doc.autoTable({
+      startY: 45,
+      head: [columns],
+      body: data.map(row => columns.map(col => row[col] || '')),
+      theme: 'grid',
+      headStyles: { fillColor: [13, 148, 136] },
+      styles: { fontSize: 9 }
+    });
+    
+    doc.save(`${fileName || currentPage}-report.pdf`);
+  };
+
+  // Export to Excel
+  const exportToExcel = (data, fileName, columns) => {
+    const filteredData = data.map(row => {
+      const filtered = {};
+      columns.forEach(col => {
+        filtered[col] = row[col] || '';
+      });
+      return filtered;
+    });
+    
+    const worksheet = XLSX.utils.json_to_sheet(filteredData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, currentPage);
+    
+    XLSX.writeFile(workbook, `${fileName || currentPage}-report.xlsx`);
+  };
+
+  // Export to CSV
+  const exportToCSV = (data, fileName, columns) => {
+    const csvContent = [
+      columns.join(','),
+      ...data.map(row => columns.map(col => `"${row[col] || ''}"`).join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    saveAs(blob, `${fileName || currentPage}-report.csv`);
+  };
+
+  // Copy to clipboard
+  const handleCopyToClipboard = () => {
+    const data = getCurrentPageData();
+    const text = JSON.stringify(data, null, 2);
+    navigator.clipboard.writeText(text).then(() => {
+      alert('✅ Data copied to clipboard!');
+    });
+    setIsExportOpen(false);
+  };
+
+  // Handle export option click
+  const handleExportClick = (option) => {
+    setExportSettings(prev => ({ ...prev, format: option.format }));
+    
+    if (option.format === 'clipboard') {
+      handleCopyToClipboard();
+    } else {
+      // Initialize selected columns
+      const allColumns = getPageColumns();
+      setExportSettings(prev => ({ ...prev, selectedColumns: allColumns }));
+      setShowExportSettings(true);
+      setIsExportOpen(false);
+    }
+  };
+
+  // Handle final export
+  const handleFinalExport = () => {
+    const data = getCurrentPageData();
+    const { format, fileName, selectedColumns } = exportSettings;
+    const columns = selectedColumns.length > 0 ? selectedColumns : getPageColumns();
+    
+    if (format === 'pdf') {
+      exportToPDF(data, fileName, columns);
+    } else if (format === 'xlsx') {
+      exportToExcel(data, fileName, columns);
+    } else if (format === 'csv') {
+      exportToCSV(data, fileName, columns);
+    }
+    
+    setShowExportSettings(false);
+    alert('✅ Export successful!');
+  };
+
+  // Handle column toggle
+  const handleColumnToggle = (column) => {
+    setExportSettings(prev => {
+      const selected = prev.selectedColumns.includes(column)
+        ? prev.selectedColumns.filter(c => c !== column)
+        : [...prev.selectedColumns, column];
+      return { ...prev, selectedColumns: selected };
+    });
+  };
+
   // Real-time search filtering
   const handleSearchChange = (e) => {
     const query = e.target.value;
@@ -334,9 +603,28 @@ const Header = () => {
   };
 
   return (
-    <header className="header">
+    <header className={`header ${isMobile ? 'mobile' : ''} ${isTablet ? 'tablet' : ''}`}>
       <div className="header-left">
-        <div className="search-wrapper" ref={searchRef}>
+        {/* Mobile Hamburger Menu */}
+        {isMobile && (
+          <button 
+            className="hamburger-menu"
+            onClick={onMenuClick}
+          >
+            <Menu size={24} />
+          </button>
+        )}
+
+        {/* Logo/Title for Mobile */}
+        {isMobile && (
+          <div className="mobile-logo">
+            <h2>Admin Panel</h2>
+          </div>
+        )}
+
+        {/* Search - Desktop/Tablet */}
+        {!isMobile && (
+          <div className="search-wrapper" ref={searchRef}>
           <div className="search-header">
             <Search size={18} />
             <input
@@ -437,21 +725,130 @@ const Header = () => {
             </div>
           )}
         </div>
+        )}
       </div>
+
+      {/* Mobile Search Bar - Below Header */}
+      {isMobile && (
+        <div className="mobile-search-bar">
+          <div className="search-wrapper mobile" ref={searchRef}>
+            <div className="search-header">
+              <Search size={18} />
+              <input
+                id="global-search-mobile"
+                type="text"
+                placeholder="Search pages, users, properties..."
+                value={searchQuery}
+                onChange={handleSearchChange}
+                onFocus={() => setIsSearchOpen(true)}
+                onKeyPress={handleKeyPress}
+              />
+              {searchQuery && (
+                <button 
+                  className="search-clear"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSearchResults([]);
+                  }}
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+
+            {/* Mobile Search Dropdown - Full Screen */}
+            {isSearchOpen && (
+              <div className="search-dropdown mobile-fullscreen">
+                {/* Same search content */}
+                {!searchQuery && recentSearches.length > 0 && (
+                  <div className="search-section">
+                    <div className="search-section-header">
+                      <p className="search-label">Recent Searches</p>
+                      <button className="clear-btn" onClick={clearRecentSearches}>Clear</button>
+                    </div>
+                    {recentSearches.map((search, idx) => (
+                      <div 
+                        key={idx} 
+                        className="search-item recent"
+                        onClick={() => handleRecentClick(search)}
+                      >
+                        <Clock size={16} />
+                        <span>{search}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {!searchQuery && (
+                  <div className="search-section">
+                    <p className="search-label">Quick Links</p>
+                    {searchData.slice(0, 5).map((item) => (
+                      <div 
+                        key={item.id} 
+                        className="search-item"
+                        onClick={() => handleResultClick(item)}
+                      >
+                        <span className="search-icon">{item.icon}</span>
+                        <div className="search-item-content">
+                          <p className="search-item-name">{item.name}</p>
+                          <span className="search-item-type">{item.category}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {searchQuery && searchResults.length > 0 && (
+                  <div className="search-section">
+                    <p className="search-label">Results ({searchResults.length})</p>
+                    {searchResults.map((result) => (
+                      <div 
+                        key={result.id} 
+                        className="search-item"
+                        onClick={() => handleResultClick(result)}
+                      >
+                        <span className="search-icon">{result.icon}</span>
+                        <div className="search-item-content">
+                          <p className="search-item-name">{result.name}</p>
+                          <span className="search-item-type">{result.category}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {searchQuery && searchResults.length === 0 && (
+                  <div className="no-results">
+                    <Search size={32} />
+                    <p>No results found for "{searchQuery}"</p>
+                    <span>Try searching for users, properties, or pages</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="header-right">
+        {/* Date Picker - Icon only on mobile */}
         <div className="date-picker-wrapper" ref={datePickerRef}>
           <button 
-            className="date-range"
+            className={`date-range ${isMobile || isTablet ? 'icon-only' : ''}`}
             onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
           >
             <Calendar size={16} />
-            <span>{formatDate(dateRange.startDate)} - {formatDate(dateRange.endDate)}</span>
-            <span className="period">{dateRange.label}</span>
+            {!isMobile && !isTablet && (
+              <>
+                <span>{formatDate(dateRange.startDate)} - {formatDate(dateRange.endDate)}</span>
+                <span className="period">{dateRange.label}</span>
+              </>
+            )}
             <ChevronDown size={14} />
           </button>
 
           {isDatePickerOpen && (
-            <div className="date-picker-dropdown">
+            <div className={`date-picker-dropdown ${isMobile ? 'mobile-fullscreen' : ''}`}>
               {/* Preset Options */}
               <div className="date-presets">
                 <p className="preset-label">Quick Select</p>
@@ -502,10 +899,6 @@ const Header = () => {
             </div>
           )}
         </div>
-        <button className="icon-btn-header">
-          <Bell size={20} />
-          <span className="badge-header">5</span>
-        </button>
 
         {/* Notification Dropdown */}
         <div className="notification-wrapper" ref={notificationRef}>
@@ -520,7 +913,7 @@ const Header = () => {
           </button>
 
           {isNotificationOpen && (
-            <div className="notification-dropdown">
+            <div className={`notification-dropdown ${isMobile ? 'mobile-fullscreen' : ''}`}>
               {/* Header */}
               <div className="notification-header">
                 <h3>Notifications</h3>
@@ -587,16 +980,188 @@ const Header = () => {
             </div>
           )}
         </div>
-        <div className="user-info-modern">
-          <div className="user-avatar-header">YA</div>
-          <div className="user-details">
-            <p className="user-name-header">Young Alaska</p>
-            <p className="user-email-header">alaska@gmail.com</p>
+
+        {/* User Profile Dropdown */}
+        <div className="user-profile-wrapper" ref={profileRef}>
+          <div className="profile-button-container">
+            <button 
+              className="user-profile-btn"
+              onClick={() => setIsProfileOpen(!isProfileOpen)}
+              onMouseEnter={() => !isMobile && setShowTooltip(true)}
+              onMouseLeave={() => !isMobile && setShowTooltip(false)}
+            >
+              <div className="user-avatar">{userData.avatar}</div>
+              {!isMobile && !isTablet && (
+                <div className="user-info">
+                  <span className="user-name">{userData.name}</span>
+                  <span className="user-email">{userData.email}</span>
+                </div>
+              )}
+              <ChevronDown 
+                size={16} 
+                className={`profile-chevron ${isProfileOpen ? 'rotate' : ''}`}
+              />
+            </button>
+
+            {/* Hover Tooltip */}
+            {showTooltip && !isProfileOpen && (
+              <div className="profile-tooltip">
+                <p className="tooltip-name">{userData.name}</p>
+                <p className="tooltip-email">{userData.email}</p>
+                <p className="tooltip-role">{userData.role}</p>
+              </div>
+            )}
           </div>
+
+          {/* Dropdown Menu */}
+          {isProfileOpen && (
+            <div className={`profile-dropdown ${isMobile ? 'mobile-fullscreen' : ''}`}>
+              {/* User Info Section */}
+              <div className="profile-dropdown-header" onClick={handleAvatarClick}>
+                <div className="profile-avatar-large">{userData.avatar}</div>
+                <div className="profile-info">
+                  <p className="profile-name">{userData.name}</p>
+                  <p className="profile-email">{userData.email}</p>
+                  <span className="profile-badge">{userData.role}</span>
+                </div>
+              </div>
+
+              <div className="profile-divider"></div>
+
+              {/* Menu Items */}
+              <div className="profile-menu-list">
+                {profileMenuItems.map((item, index) => (
+                  <button
+                    key={index}
+                    className={`profile-menu-item ${item.danger ? 'danger' : ''}`}
+                    onClick={() => handleMenuItemClick(item)}
+                  >
+                    <span className="menu-icon">{item.icon}</span>
+                    <span className="menu-label">{item.label}</span>
+                    {item.action === 'toggle-dark-mode' && (
+                      <div className={`toggle-switch ${isDarkMode ? 'active' : ''}`}>
+                        <div className="toggle-slider"></div>
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-        <button className="export-btn">
-          🎯 Export
-        </button>
+
+        {/* Export Dropdown */}
+        <div className="export-wrapper" ref={exportRef}>
+          <button 
+            className="export-btn"
+            onClick={() => setIsExportOpen(!isExportOpen)}
+          >
+            🎯 {!isMobile && !isTablet && 'Export'}
+            <ChevronDown size={16} className={`export-chevron ${isExportOpen ? 'rotate' : ''}`} />
+          </button>
+
+          {isExportOpen && (
+            <div className={`export-dropdown ${isMobile ? 'mobile-fullscreen' : ''}`}>
+              <div className="export-header">
+                <h4>Export Options</h4>
+                <p className="export-page-name">Page: {currentPage}</p>
+              </div>
+              
+              <div className="export-options-list">
+                {exportOptions.map((option, index) => (
+                  <button
+                    key={index}
+                    className="export-option-item"
+                    onClick={() => handleExportClick(option)}
+                  >
+                    <span className="export-icon">{option.icon}</span>
+                    <div className="export-info">
+                      <p className="export-label">{option.label}</p>
+                      <span className="export-description">{option.description}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Export Settings Modal */}
+        {showExportSettings && (
+          <div className="export-settings-modal">
+            <div className="modal-overlay" onClick={() => setShowExportSettings(false)}></div>
+            <div className="modal-content">
+              <div className="modal-header">
+                <h3>📊 Export Settings</h3>
+                <button className="modal-close" onClick={() => setShowExportSettings(false)}>✕</button>
+              </div>
+              
+              <div className="modal-body">
+                {/* File Name */}
+                <div className="form-group">
+                  <label>File Name</label>
+                  <input
+                    type="text"
+                    className="modal-input"
+                    placeholder={`${currentPage}-report`}
+                    value={exportSettings.fileName}
+                    onChange={(e) => setExportSettings({...exportSettings, fileName: e.target.value})}
+                  />
+                </div>
+
+                {/* Date Range Toggle */}
+                <div className="form-group">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={exportSettings.dateRange}
+                      onChange={(e) => setExportSettings({...exportSettings, dateRange: e.target.checked})}
+                    />
+                    <span>Include Date Range: {formatDate(dateRange.startDate)} - {formatDate(dateRange.endDate)}</span>
+                  </label>
+                </div>
+
+                {/* Column Selection */}
+                <div className="form-group">
+                  <label>Select Columns to Export</label>
+                  <div className="column-checkboxes">
+                    {getPageColumns().map((col, idx) => (
+                      <label key={idx} className="checkbox-label">
+                        <input 
+                          type="checkbox" 
+                          checked={exportSettings.selectedColumns.includes(col)}
+                          onChange={() => handleColumnToggle(col)}
+                        />
+                        <span>{col}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Format Display */}
+                <div className="form-group">
+                  <label>Export Format</label>
+                  <div className="format-badge">
+                    {exportSettings.format.toUpperCase()}
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button className="btn-secondary-modal" onClick={() => setShowExportSettings(false)}>
+                  Cancel
+                </button>
+                <button 
+                  className="btn-primary-modal" 
+                  onClick={handleFinalExport}
+                  disabled={exportSettings.selectedColumns.length === 0}
+                >
+                  🎯 Export Now
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </header>
   );
