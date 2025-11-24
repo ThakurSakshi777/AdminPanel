@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Plus, Edit, Trash2, X } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const Users = () => {
   const [users, setUsers] = useState([
@@ -8,11 +8,20 @@ const Users = () => {
     { id: 3, name: 'Amit Kumar', email: 'amit@example.com', role: 'Customer', status: 'Inactive', phone: '+91 98765 43212', joined: 'Mar 2024' },
     { id: 4, name: 'Sneha Desai', email: 'sneha@example.com', role: 'Agent', status: 'Active', phone: '+91 98765 43213', joined: 'Apr 2024' },
     { id: 5, name: 'Vikram Singh', email: 'vikram@example.com', role: 'Customer', status: 'Active', phone: '+91 98765 43214', joined: 'May 2024' },
+    { id: 6, name: 'Anjali Mehta', email: 'anjali@example.com', role: 'Customer', status: 'Active', phone: '+91 98765 43215', joined: 'Jun 2024' },
+    { id: 7, name: 'Rajesh Gupta', email: 'rajesh@example.com', role: 'Agent', status: 'Active', phone: '+91 98765 43216', joined: 'Jul 2024' },
+    { id: 8, name: 'Pooja Verma', email: 'pooja@example.com', role: 'Customer', status: 'Inactive', phone: '+91 98765 43217', joined: 'Aug 2024' },
+    { id: 9, name: 'Suresh Reddy', email: 'suresh@example.com', role: 'Agent', status: 'Active', phone: '+91 98765 43218', joined: 'Sep 2024' },
+    { id: 10, name: 'Kavita Joshi', email: 'kavita@example.com', role: 'Customer', status: 'Active', phone: '+91 98765 43219', joined: 'Oct 2024' },
+    { id: 11, name: 'Manoj Yadav', email: 'manoj@example.com', role: 'Customer', status: 'Active', phone: '+91 98765 43220', joined: 'Nov 2024' },
+    { id: 12, name: 'Neha Kapoor', email: 'neha@example.com', role: 'Agent', status: 'Active', phone: '+91 98765 43221', joined: 'Nov 2024' },
   ]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(5); // Users per page
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -105,6 +114,34 @@ const Users = () => {
     user.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Pagination logic
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+  const indexOfLastUser = currentPage * itemsPerPage;
+  const indexOfFirstUser = indexOfLastUser - itemsPerPage;
+  const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  // Reset to page 1 when search changes
+  const handleSearch = (e) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1);
+  };
+
   return (
     <div className="page-container">
       <div className="page-header-modern">
@@ -134,7 +171,7 @@ const Users = () => {
           type="text" 
           placeholder="Search users by name or email..." 
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={handleSearch}
         />
       </div>
 
@@ -151,7 +188,7 @@ const Users = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredUsers.map((user) => (
+            {currentUsers.map((user) => (
               <tr key={user.id}>
                 <td>
                   <div className="user-cell">
@@ -188,6 +225,47 @@ const Users = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Controls */}
+      {filteredUsers.length > 0 && (
+        <div className="pagination-container">
+          <div className="pagination-info">
+            Showing {indexOfFirstUser + 1} to {Math.min(indexOfLastUser, filteredUsers.length)} of {filteredUsers.length} users
+          </div>
+          
+          <div className="pagination-controls">
+            <button 
+              className="pagination-btn"
+              onClick={handlePrevPage}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft size={18} />
+              Previous
+            </button>
+            
+            <div className="pagination-numbers">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                <button
+                  key={pageNum}
+                  className={`pagination-number ${currentPage === pageNum ? 'active' : ''}`}
+                  onClick={() => handlePageChange(pageNum)}
+                >
+                  {pageNum}
+                </button>
+              ))}
+            </div>
+            
+            <button 
+              className="pagination-btn"
+              onClick={handleNextPage}
+              disabled={currentPage === totalPages}
+            >
+              Next
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Add/Edit User Modal */}
       {isModalOpen && (

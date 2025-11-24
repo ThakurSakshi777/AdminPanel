@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, ArrowLeft, CheckCircle, Lock } from 'lucide-react';
+import { forgotPassword, verifyOTP, resetPassword } from '../services/authService';
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
@@ -12,7 +13,7 @@ const ForgotPassword = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleEmailSubmit = (e) => {
+  const handleEmailSubmit = async (e) => {
     e.preventDefault();
     
     if (!email) {
@@ -28,14 +29,20 @@ const ForgotPassword = () => {
     setIsLoading(true);
     setError('');
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const data = await forgotPassword(email);
+
+      // Show success message
+      alert(data.message || 'OTP sent to your email!');
       setIsLoading(false);
       setStep(2);
-    }, 1500);
+    } catch (error) {
+      setError(error.message || 'Failed to send OTP. Please try again.');
+      setIsLoading(false);
+    }
   };
 
-  const handleVerificationSubmit = (e) => {
+  const handleVerificationSubmit = async (e) => {
     e.preventDefault();
 
     if (!verificationCode) {
@@ -51,14 +58,20 @@ const ForgotPassword = () => {
     setIsLoading(true);
     setError('');
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const data = await verifyOTP(email, verificationCode);
+
+      // Show success message
+      alert(data.message || 'OTP verified successfully!');
       setIsLoading(false);
       setStep(3);
-    }, 1500);
+    } catch (error) {
+      setError(error.message || 'Invalid OTP. Please try again.');
+      setIsLoading(false);
+    }
   };
 
-  const handlePasswordReset = (e) => {
+  const handlePasswordReset = async (e) => {
     e.preventDefault();
 
     if (!newPassword) {
@@ -79,12 +92,17 @@ const ForgotPassword = () => {
     setIsLoading(true);
     setError('');
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const data = await resetPassword(email, newPassword);
+
+      // Show success message
       setIsLoading(false);
-      alert('Password reset successful! You can now login with your new password.');
+      alert(data.message || 'Password reset successful! You can now login with your new password.');
       navigate('/login');
-    }, 1500);
+    } catch (error) {
+      setError(error.message || 'Failed to reset password. Please try again.');
+      setIsLoading(false);
+    }
   };
 
   const handleResendCode = () => {

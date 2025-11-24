@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Search, Plus, Edit, Trash2, MapPin, Home, Building2, TrendingUp, X, Upload, Image as ImageIcon } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, MapPin, Home, Building2, TrendingUp, X, Upload, Image as ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const Properties = () => {
   const fileInputRef = useRef(null);
@@ -9,12 +9,21 @@ const Properties = () => {
     { id: 3, title: 'Villa with Garden', location: 'Bangalore, Karnataka', price: '₹2.5 Cr', type: 'Villa', status: 'Available', beds: 4, baths: 3, sqft: '2,800', images: [] },
     { id: 4, title: 'Commercial Space', location: 'Delhi, NCR', price: '₹5 Cr', type: 'Commercial', status: 'Available', beds: '-', baths: 4, sqft: '5,000', images: [] },
     { id: 5, title: '1BHK Studio Apartment', location: 'Gurgaon, Haryana', price: '₹45 Lac', type: 'Apartment', status: 'Available', beds: 1, baths: 1, sqft: '650', images: [] },
+    { id: 6, title: '4BHK Penthouse', location: 'Mumbai, Maharashtra', price: '₹3.5 Cr', type: 'Apartment', status: 'Available', beds: 4, baths: 3, sqft: '2,200', images: [] },
+    { id: 7, title: 'Office Space', location: 'Noida, UP', price: '₹2 Cr', type: 'Commercial', status: 'Available', beds: '-', baths: 2, sqft: '3,000', images: [] },
+    { id: 8, title: '3BHK Sea View Flat', location: 'Chennai, Tamil Nadu', price: '₹1.8 Cr', type: 'Flat', status: 'Available', beds: 3, baths: 2, sqft: '1,600', images: [] },
+    { id: 9, title: 'Independent House', location: 'Jaipur, Rajasthan', price: '₹95 Lac', type: 'Villa', status: 'Sold', beds: 3, baths: 2, sqft: '1,800', images: [] },
+    { id: 10, title: 'Retail Shop', location: 'Kolkata, West Bengal', price: '₹80 Lac', type: 'Commercial', status: 'Available', beds: '-', baths: 1, sqft: '800', images: [] },
+    { id: 11, title: '2BHK Garden Apartment', location: 'Hyderabad, Telangana', price: '₹90 Lac', type: 'Apartment', status: 'Available', beds: 2, baths: 2, sqft: '1,200', images: [] },
+    { id: 12, title: 'Luxury Villa', location: 'Goa', price: '₹5 Cr', type: 'Villa', status: 'Available', beds: 5, baths: 4, sqft: '3,500', images: [] },
   ]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [uploadedImages, setUploadedImages] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(6); // Properties per page
   const [formData, setFormData] = useState({
     title: '',
     location: '',
@@ -148,11 +157,71 @@ const Properties = () => {
     property.location.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Pagination logic
+  const totalPages = Math.ceil(filteredProperties.length / itemsPerPage);
+  const indexOfLastProperty = currentPage * itemsPerPage;
+  const indexOfFirstProperty = indexOfLastProperty - itemsPerPage;
+  const currentProperties = filteredProperties.slice(indexOfFirstProperty, indexOfLastProperty);
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  // Reset to page 1 when search changes
+  const handleSearch = (e) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1);
+  };
+
+  // Calculate dynamic stats from properties data
+  const totalProperties = properties.length;
+  const availableProperties = properties.filter(p => p.status === 'Available').length;
+  const soldProperties = properties.filter(p => p.status === 'Sold').length;
+  
+  // Calculate total revenue from sold properties
+  const calculateRevenue = () => {
+    const soldProps = properties.filter(p => p.status === 'Sold');
+    let totalRevenue = 0;
+    
+    soldProps.forEach(prop => {
+      const priceStr = prop.price.replace('₹', '').trim();
+      let value = 0;
+      
+      if (priceStr.includes('Cr')) {
+        value = parseFloat(priceStr.replace('Cr', '').trim()) * 10000000;
+      } else if (priceStr.includes('Lac')) {
+        value = parseFloat(priceStr.replace('Lac', '').trim()) * 100000;
+      }
+      
+      totalRevenue += value;
+    });
+    
+    // Format revenue
+    if (totalRevenue >= 10000000) {
+      return `₹${(totalRevenue / 10000000).toFixed(1)} Cr`;
+    } else if (totalRevenue >= 100000) {
+      return `₹${(totalRevenue / 100000).toFixed(0)} Lac`;
+    }
+    return `₹${totalRevenue}`;
+  };
+
   const stats = [
-    { label: 'Total Properties', value: '567', icon: Home, color: '#0d9488' },
-    { label: 'Available', value: '423', icon: Building2, color: '#14b8a6' },
-    { label: 'Sold', value: '98', icon: TrendingUp, color: '#2dd4bf' },
-    { label: 'Revenue', value: '₹45 Cr', icon: TrendingUp, color: '#5eead4' },
+    { label: 'Total Properties', value: totalProperties.toString(), icon: Home, color: '#0d9488' },
+    { label: 'Available', value: availableProperties.toString(), icon: Building2, color: '#14b8a6' },
+    { label: 'Sold', value: soldProperties.toString(), icon: TrendingUp, color: '#2dd4bf' },
+    { label: 'Revenue', value: calculateRevenue(), icon: TrendingUp, color: '#5eead4' },
   ];
 
   return (
@@ -189,7 +258,7 @@ const Properties = () => {
           type="text" 
           placeholder="Search properties by title or location..." 
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={handleSearch}
         />
       </div>
 
@@ -206,7 +275,7 @@ const Properties = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredProperties.map((property) => (
+            {currentProperties.map((property) => (
               <tr key={property.id}>
                 <td>
                   <div className="property-cell">
@@ -249,6 +318,47 @@ const Properties = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Controls */}
+      {filteredProperties.length > 0 && (
+        <div className="pagination-container">
+          <div className="pagination-info">
+            Showing {indexOfFirstProperty + 1} to {Math.min(indexOfLastProperty, filteredProperties.length)} of {filteredProperties.length} properties
+          </div>
+          
+          <div className="pagination-controls">
+            <button 
+              className="pagination-btn"
+              onClick={handlePrevPage}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft size={18} />
+              Previous
+            </button>
+            
+            <div className="pagination-numbers">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                <button
+                  key={pageNum}
+                  className={`pagination-number ${currentPage === pageNum ? 'active' : ''}`}
+                  onClick={() => handlePageChange(pageNum)}
+                >
+                  {pageNum}
+                </button>
+              ))}
+            </div>
+            
+            <button 
+              className="pagination-btn"
+              onClick={handleNextPage}
+              disabled={currentPage === totalPages}
+            >
+              Next
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Add/Edit Property Modal */}
       {isModalOpen && (

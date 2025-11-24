@@ -1,8 +1,75 @@
 import { Lock, Key, Shield, Eye, EyeOff } from 'lucide-react';
 import { useState } from 'react';
+import { changePassword } from '../services/securityService';
 
 const Security = () => {
   const [showPassword, setShowPassword] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState({ type: '', text: '' });
+
+  const handlePasswordChange = (e) => {
+    const { name, value } = e.target;
+    setPasswordData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    // Clear message when user starts typing
+    if (message.text) setMessage({ type: '', text: '' });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Validation
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      setMessage({ type: 'error', text: 'All fields are required' });
+      return;
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setMessage({ type: 'error', text: 'New passwords do not match' });
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      setMessage({ type: 'error', text: 'Password must be at least 6 characters long' });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setMessage({ type: '', text: '' });
+      
+      await changePassword({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+        confirmNewPassword: passwordData.confirmPassword
+      });
+
+      setMessage({ type: 'success', text: 'Password changed successfully!' });
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err) {
+      console.error('Error changing password:', err);
+      console.error('Error response:', err.response?.data);
+      
+      // Get specific error message from backend
+      const errorMessage = err.response?.data?.message || 
+                          err.response?.data?.error || 
+                          'Failed to change password. Please try again.';
+      
+      setMessage({ 
+        type: 'error', 
+        text: errorMessage
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="page-container">
@@ -19,13 +86,31 @@ const Security = () => {
             <Lock size={24} />
             <h3>Change Password</h3>
           </div>
-          <form className="security-form">
+          
+          {message.text && (
+            <div style={{ 
+              padding: '10px', 
+              marginBottom: '15px', 
+              borderRadius: '6px',
+              backgroundColor: message.type === 'success' ? '#d4edda' : '#f8d7da',
+              color: message.type === 'success' ? '#155724' : '#721c24',
+              border: `1px solid ${message.type === 'success' ? '#c3e6cb' : '#f5c6cb'}`
+            }}>
+              {message.text}
+            </div>
+          )}
+
+          <form className="security-form" onSubmit={handleSubmit}>
             <div className="form-group">
               <label>Current Password</label>
               <div className="password-input">
                 <input 
                   type={showPassword ? "text" : "password"} 
-                  placeholder="Enter current password" 
+                  name="currentPassword"
+                  value={passwordData.currentPassword}
+                  onChange={handlePasswordChange}
+                  placeholder="Enter current password"
+                  disabled={loading}
                 />
                 <button 
                   type="button" 
@@ -38,13 +123,29 @@ const Security = () => {
             </div>
             <div className="form-group">
               <label>New Password</label>
-              <input type="password" placeholder="Enter new password" />
+              <input 
+                type="password" 
+                name="newPassword"
+                value={passwordData.newPassword}
+                onChange={handlePasswordChange}
+                placeholder="Enter new password"
+                disabled={loading}
+              />
             </div>
             <div className="form-group">
               <label>Confirm New Password</label>
-              <input type="password" placeholder="Confirm new password" />
+              <input 
+                type="password" 
+                name="confirmPassword"
+                value={passwordData.confirmPassword}
+                onChange={handlePasswordChange}
+                placeholder="Confirm new password"
+                disabled={loading}
+              />
             </div>
-            <button type="submit" className="btn-primary">Update Password</button>
+            <button type="submit" className="btn-primary" disabled={loading}>
+              {loading ? 'Updating...' : 'Update Password'}
+            </button>
           </form>
         </div>
 

@@ -9,18 +9,23 @@ const getToken = () => {
 // Helper function to get headers with token
 const getHeaders = () => {
   const token = getToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { Authorization: `Bearer ${token}` })
+  const headers = {
+    'Content-Type': 'application/json'
   };
+  
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  
+  return headers;
 };
 
-// Register new user
+// Register new user (SignUp)
 export const registerUser = async (userData) => {
   try {
     const response = await fetch(`${API_URL}/signup`, {
       method: 'POST',
-      headers: getHeaders(),
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         fullName: userData.name,
         email: userData.email,
@@ -59,7 +64,7 @@ export const loginUser = async (credentials) => {
   try {
     const response = await fetch(`${API_URL}/login`, {
       method: 'POST',
-      headers: getHeaders(),
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email: credentials.email,
         password: credentials.password
@@ -93,45 +98,73 @@ export const loginUser = async (credentials) => {
   }
 };
 
-// Verify token
-export const verifyToken = async () => {
+// Forgot Password - Send OTP
+export const forgotPassword = async (email) => {
   try {
-    const token = getToken();
-    if (!token) {
-      throw new Error('No token found');
-    }
-
-    const response = await fetch(`${API_URL}/verify-token`, {
+    const response = await fetch(`${API_URL}/forgot-password`, {
       method: 'POST',
-      headers: getHeaders(),
-      body: JSON.stringify({ token })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.message || 'Token verification failed');
-    }
-
-    // Update user data in localStorage
-    if (data.user) {
-      localStorage.setItem('userName', data.user.fullName || data.user.name);
-      localStorage.setItem('userEmail', data.user.email);
-      localStorage.setItem('userId', data.user.id);
-      localStorage.setItem('userRole', data.user.role);
+      throw new Error(data.message || 'Failed to send OTP');
     }
 
     return data;
   } catch (error) {
-    console.error('Verify token error:', error);
-    // Clear invalid token
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('isAuthenticated');
+    console.error('Forgot password error:', error);
     throw error;
   }
 };
 
-// Get current user
+// Verify OTP
+export const verifyOTP = async (email, otp) => {
+  try {
+    const response = await fetch(`${API_URL}/verify-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, otp })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Invalid OTP');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Verify OTP error:', error);
+    throw error;
+  }
+};
+
+// Reset Password
+export const resetPassword = async (email, newPassword) => {
+  try {
+    const response = await fetch(`${API_URL}/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, newPassword })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to reset password');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Reset password error:', error);
+    throw error;
+  }
+};
+
+// Get current user (if backend provides this endpoint)
 export const getCurrentUser = async () => {
   try {
     const response = await fetch(`${API_URL}/me`, {
@@ -161,12 +194,11 @@ export const logoutUser = () => {
   localStorage.removeItem('userId');
   localStorage.removeItem('userRole');
   localStorage.removeItem('userPhone');
-  localStorage.removeItem('userAddress');
-  localStorage.removeItem('userCompany');
 };
 
 // Check if user is authenticated
 export const isAuthenticated = () => {
   const token = getToken();
-  return !!token;
+  const isAuth = localStorage.getItem('isAuthenticated');
+  return !!token || isAuth === 'true';
 };

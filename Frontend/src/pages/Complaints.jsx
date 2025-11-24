@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, AlertTriangle, CheckCircle, X } from 'lucide-react';
+import { Search, AlertTriangle, CheckCircle, X, Edit, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const Complaints = () => {
   const [complaints, setComplaints] = useState([
@@ -11,7 +11,10 @@ const Complaints = () => {
   ]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingComplaint, setEditingComplaint] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
   const [formData, setFormData] = useState({
     customer: '',
     property: '',
@@ -20,19 +23,32 @@ const Complaints = () => {
     status: 'Open'
   });
 
-  const handleOpenModal = () => {
-    setFormData({
-      customer: '',
-      property: '',
-      issue: '',
-      priority: 'Medium',
-      status: 'Open'
-    });
+  const handleOpenModal = (complaint = null) => {
+    if (complaint) {
+      setEditingComplaint(complaint);
+      setFormData({
+        customer: complaint.customer,
+        property: complaint.property,
+        issue: complaint.issue,
+        priority: complaint.priority,
+        status: complaint.status
+      });
+    } else {
+      setEditingComplaint(null);
+      setFormData({
+        customer: '',
+        property: '',
+        issue: '',
+        priority: 'Medium',
+        status: 'Open'
+      });
+    }
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
+    setEditingComplaint(null);
     setFormData({
       customer: '',
       property: '',
@@ -53,12 +69,20 @@ const Complaints = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    const newComplaint = {
-      id: complaints.length + 1,
-      ...formData,
-      date: new Date().toISOString().split('T')[0]
-    };
-    setComplaints(prev => [...prev, newComplaint]);
+    if (editingComplaint) {
+      setComplaints(prev => prev.map(complaint => 
+        complaint.id === editingComplaint.id 
+          ? { ...complaint, ...formData }
+          : complaint
+      ));
+    } else {
+      const newComplaint = {
+        id: complaints.length + 1,
+        ...formData,
+        date: new Date().toISOString().split('T')[0]
+      };
+      setComplaints(prev => [...prev, newComplaint]);
+    }
     
     handleCloseModal();
   };
@@ -71,11 +95,41 @@ const Complaints = () => {
     ));
   };
 
+  const handleDeleteComplaint = (complaintId) => {
+    if (window.confirm('Are you sure you want to delete this complaint?')) {
+      setComplaints(prev => prev.filter(complaint => complaint.id !== complaintId));
+    }
+  };
+
   const filteredComplaints = complaints.filter(complaint =>
     complaint.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
     complaint.property.toLowerCase().includes(searchTerm.toLowerCase()) ||
     complaint.issue.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredComplaints.length / itemsPerPage);
+  const indexOfLastComplaint = currentPage * itemsPerPage;
+  const indexOfFirstComplaint = indexOfLastComplaint - itemsPerPage;
+  const currentComplaints = filteredComplaints.slice(indexOfFirstComplaint, indexOfLastComplaint);
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+  };
+
+  // Reset to page 1 when search changes
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1);
+  };
 
   const getPriorityColor = (priority) => {
     const colors = {
@@ -106,7 +160,7 @@ const Complaints = () => {
           type="text" 
           placeholder="Search complaints..." 
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={handleSearchChange}
         />
       </div>
 
@@ -125,7 +179,7 @@ const Complaints = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredComplaints.map((complaint) => (
+            {currentComplaints.map((complaint) => (
               <tr key={complaint.id}>
                 <td>#{complaint.id}</td>
                 <td>{complaint.customer}</td>
@@ -152,14 +206,28 @@ const Complaints = () => {
                   </span>
                 </td>
                 <td>
-                  <div className="action-buttons">
+                  <div className="action-buttons-modern">
                     <button 
-                      className="btn-icon success" 
+                      className="btn-icon-modern success" 
                       title="Resolve"
                       onClick={() => handleResolve(complaint.id)}
                       disabled={complaint.status === 'Resolved'}
                     >
                       <CheckCircle size={16} />
+                    </button>
+                    <button 
+                      className="btn-icon-modern edit" 
+                      title="Edit Complaint"
+                      onClick={() => handleOpenModal(complaint)}
+                    >
+                      <Edit size={16} />
+                    </button>
+                    <button 
+                      className="btn-icon-modern delete" 
+                      title="Delete Complaint"
+                      onClick={() => handleDeleteComplaint(complaint.id)}
+                    >
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 </td>
@@ -169,12 +237,49 @@ const Complaints = () => {
         </table>
       </div>
 
+      {/* Pagination Controls */}
+      {filteredComplaints.length > 0 && (
+        <div className="pagination-container">
+          <div className="pagination-info">
+            Showing {indexOfFirstComplaint + 1} to {Math.min(indexOfLastComplaint, filteredComplaints.length)} of {filteredComplaints.length} complaints
+          </div>
+          
+          <div className="pagination-controls">
+            <button 
+              className="pagination-btn" 
+              onClick={handlePrevPage}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft size={18} />
+            </button>
+            
+            {[...Array(totalPages)].map((_, index) => (
+              <button
+                key={index + 1}
+                className={`pagination-btn ${currentPage === index + 1 ? 'active' : ''}`}
+                onClick={() => handlePageChange(index + 1)}
+              >
+                {index + 1}
+              </button>
+            ))}
+            
+            <button 
+              className="pagination-btn" 
+              onClick={handleNextPage}
+              disabled={currentPage === totalPages}
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Add New Complaint Modal */}
       {isModalOpen && (
         <div className="modal-overlay" onClick={handleCloseModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>New Complaint</h3>
+              <h3>{editingComplaint ? 'Edit Complaint' : 'New Complaint'}</h3>
               <button className="modal-close" onClick={handleCloseModal}>
                 <X size={20} />
               </button>
@@ -267,7 +372,7 @@ const Complaints = () => {
                   Cancel
                 </button>
                 <button type="submit" className="btn-submit">
-                  Add Complaint
+                  {editingComplaint ? 'Update Complaint' : 'Add Complaint'}
                 </button>
               </div>
             </form>

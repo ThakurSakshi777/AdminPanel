@@ -394,7 +394,9 @@ const Header = ({ onMenuClick, isSidebarOpen }) => {
       });
     } else if (item.action === 'logout') {
       // Logout logic - clear token and redirect
+      console.log('Logging out...');
       logoutUser();
+      setIsProfileOpen(false);
       navigate('/login');
     } else if (item.action === 'download-reports') {
       // Download functionality

@@ -1,41 +1,81 @@
-import { useState } from 'react';
-import { Search, MessageSquare, CheckCircle, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, MessageSquare, CheckCircle, X, Edit, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { getAllInquiries, createInquiry, updateInquiry, deleteInquiry } from '../services/inquiryService';
 
 const Inquiries = () => {
-  const [inquiries, setInquiries] = useState([
-    { id: 1, customer: 'Rahul Sharma', property: '3BHK Luxury Apartment', message: 'Interested in visiting', date: '2024-11-21', status: 'New' },
-    { id: 2, customer: 'Amit Kumar', property: 'Villa with Garden', message: 'Want to know about pricing', date: '2024-11-20', status: 'Replied' },
-    { id: 3, customer: 'Vikram Singh', property: '2BHK Modern Flat', message: 'Is loan facility available?', date: '2024-11-19', status: 'New' },
-    { id: 4, customer: 'Neha Gupta', property: 'Commercial Space', message: 'Need complete details', date: '2024-11-18', status: 'Closed' },
-    { id: 5, customer: 'Ravi Verma', property: '1BHK Studio Apartment', message: 'Schedule a visit', date: '2024-11-21', status: 'New' },
-  ]);
-
+  const [inquiries, setInquiries] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingInquiry, setEditingInquiry] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
   const [formData, setFormData] = useState({
-    customer: '',
-    property: '',
-    message: '',
-    status: 'New'
+    clientName: '',
+    contactNumber: '',
+    productType: '',
+    location: '',
+    caseStatus: 'New',
+    majorComments: ''
   });
 
-  const handleOpenModal = () => {
-    setFormData({
-      customer: '',
-      property: '',
-      message: '',
-      status: 'New'
-    });
+  // Fetch inquiries on component mount
+  useEffect(() => {
+    fetchInquiries();
+  }, []);
+
+  const fetchInquiries = async () => {
+    try {
+      setLoading(true);
+      const response = await getAllInquiries();
+      const inquiriesData = Array.isArray(response) ? response : (response.data || []);
+      setInquiries(inquiriesData);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching inquiries:', err);
+      setError('Failed to load inquiries');
+      setInquiries([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenModal = (inquiry = null) => {
+    if (inquiry) {
+      setEditingInquiry(inquiry);
+      setFormData({
+        clientName: inquiry.clientName || '',
+        contactNumber: inquiry.contactNumber || '',
+        productType: inquiry.productType || '',
+        location: inquiry.location || '',
+        caseStatus: inquiry.caseStatus || 'New',
+        majorComments: inquiry.majorComments || ''
+      });
+    } else {
+      setEditingInquiry(null);
+      setFormData({
+        clientName: '',
+        contactNumber: '',
+        productType: '',
+        location: '',
+        caseStatus: 'New',
+        majorComments: ''
+      });
+    }
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
+    setEditingInquiry(null);
     setFormData({
-      customer: '',
-      property: '',
-      message: '',
-      status: 'New'
+      clientName: '',
+      contactNumber: '',
+      productType: '',
+      location: '',
+      caseStatus: 'New',
+      majorComments: ''
     });
   };
 
@@ -47,32 +87,75 @@ const Inquiries = () => {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
-    const newInquiry = {
-      id: inquiries.length + 1,
-      ...formData,
-      date: new Date().toISOString().split('T')[0]
-    };
-    setInquiries(prev => [...prev, newInquiry]);
-    
-    handleCloseModal();
+    try {
+      if (editingInquiry) {
+        await updateInquiry(editingInquiry._id, formData);
+      } else {
+        await createInquiry(formData);
+      }
+      handleCloseModal();
+      fetchInquiries(); // Refresh list
+    } catch (err) {
+      console.error('Error saving inquiry:', err);
+      alert('Failed to save inquiry: ' + (err.message || 'Unknown error'));
+    }
   };
 
-  const handleMarkResolved = (inquiryId) => {
-    setInquiries(prev => prev.map(inquiry => 
-      inquiry.id === inquiryId 
-        ? { ...inquiry, status: 'Closed' }
-        : inquiry
-    ));
+  const handleMarkResolved = async (inquiry) => {
+    try {
+      await updateInquiry(inquiry._id, { caseStatus: 'Closed' });
+      fetchInquiries(); // Refresh list
+    } catch (err) {
+      console.error('Error updating inquiry:', err);
+      alert('Failed to update inquiry status');
+    }
+  };
+
+  const handleDeleteInquiry = async (inquiryId) => {
+    if (window.confirm('Are you sure you want to delete this inquiry?')) {
+      try {
+        await deleteInquiry(inquiryId);
+        fetchInquiries(); // Refresh list
+      } catch (err) {
+        console.error('Error deleting inquiry:', err);
+        alert('Failed to delete inquiry');
+      }
+    }
   };
 
   const filteredInquiries = inquiries.filter(inquiry =>
-    inquiry.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    inquiry.property.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    inquiry.message.toLowerCase().includes(searchTerm.toLowerCase())
+    inquiry.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    inquiry.productType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    inquiry.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    inquiry.majorComments?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredInquiries.length / itemsPerPage);
+  const indexOfLastInquiry = currentPage * itemsPerPage;
+  const indexOfFirstInquiry = indexOfLastInquiry - itemsPerPage;
+  const currentInquiries = filteredInquiries.slice(indexOfFirstInquiry, indexOfLastInquiry);
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+  };
+
+  // Reset to page 1 when search changes
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1);
+  };
 
   return (
     <div className="page-container">
@@ -81,7 +164,7 @@ const Inquiries = () => {
           <h2>Customer Inquiries</h2>
           <p className="subtitle">Manage customer queries and requests</p>
         </div>
-        <button className="btn-primary-modern" onClick={handleOpenModal}>
+        <button className="btn-primary-modern" onClick={() => handleOpenModal()}>
           <MessageSquare size={18} />
           New Inquiry
         </button>
@@ -93,65 +176,143 @@ const Inquiries = () => {
           type="text" 
           placeholder="Search inquiries..." 
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={handleSearchChange}
         />
       </div>
 
-      <div className="table-container">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Customer</th>
-              <th>Property</th>
-              <th>Message</th>
-              <th>Date</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredInquiries.map((inquiry) => (
-              <tr key={inquiry.id}>
-                <td>#{inquiry.id}</td>
-                <td>{inquiry.customer}</td>
-                <td>{inquiry.property}</td>
-                <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <MessageSquare size={14} />
-                    {inquiry.message}
-                  </div>
-                </td>
-                <td>{inquiry.date}</td>
-                <td>
-                  <span className={`badge-status ${inquiry.status.toLowerCase()}`}>
-                    {inquiry.status}
-                  </span>
-                </td>
-                <td>
-                  <div className="action-buttons">
-                    <button 
-                      className="btn-icon success" 
-                      title="Mark as Resolved"
-                      onClick={() => handleMarkResolved(inquiry.id)}
-                      disabled={inquiry.status === 'Closed'}
-                    >
-                      <CheckCircle size={16} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '50px' }}>
+          <p>Loading inquiries...</p>
+        </div>
+      ) : error ? (
+        <div style={{ textAlign: 'center', padding: '50px', color: 'red' }}>
+          <p>{error}</p>
+          <button onClick={fetchInquiries} className="btn-primary-modern" style={{ marginTop: '10px' }}>
+            Retry
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="table-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Client Name</th>
+                  <th>Contact</th>
+                  <th>Product Type</th>
+                  <th>Location</th>
+                  <th>Comments</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {currentInquiries.length === 0 ? (
+                  <tr>
+                    <td colSpan="9" style={{ textAlign: 'center', padding: '30px' }}>
+                      No inquiries found
+                    </td>
+                  </tr>
+                ) : (
+                  currentInquiries.map((inquiry, index) => (
+                    <tr key={inquiry._id || index}>
+                      <td>#{inquiry.s_No || (index + 1)}</td>
+                      <td>{inquiry.clientName || 'N/A'}</td>
+                      <td>{inquiry.contactNumber || 'N/A'}</td>
+                      <td>{inquiry.productType || 'N/A'}</td>
+                      <td>{inquiry.location || 'N/A'}</td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <MessageSquare size={14} />
+                          {inquiry.majorComments || 'N/A'}
+                        </div>
+                      </td>
+                      <td>{inquiry.date ? new Date(inquiry.date).toLocaleDateString() : 'N/A'}</td>
+                      <td>
+                        <span className={`badge-status ${inquiry.caseStatus?.toLowerCase() || 'new'}`}>
+                          {inquiry.caseStatus || 'New'}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="action-buttons-modern">
+                          <button 
+                            className="btn-icon-modern success" 
+                            title="Mark as Resolved"
+                            onClick={() => handleMarkResolved(inquiry)}
+                            disabled={inquiry.caseStatus === 'Closed'}
+                          >
+                            <CheckCircle size={16} />
+                          </button>
+                          <button 
+                            className="btn-icon-modern edit" 
+                            title="Edit Inquiry"
+                            onClick={() => handleOpenModal(inquiry)}
+                          >
+                            <Edit size={16} />
+                          </button>
+                          <button 
+                            className="btn-icon-modern delete" 
+                            title="Delete Inquiry"
+                            onClick={() => handleDeleteInquiry(inquiry._id)}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination Controls */}
+          {filteredInquiries.length > 0 && (
+            <div className="pagination-container">
+              <div className="pagination-info">
+                Showing {indexOfFirstInquiry + 1} to {Math.min(indexOfLastInquiry, filteredInquiries.length)} of {filteredInquiries.length} inquiries
+              </div>
+              
+              <div className="pagination-controls">
+                <button 
+                  className="pagination-btn" 
+                  onClick={handlePrevPage}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                
+                {[...Array(totalPages)].map((_, index) => (
+                  <button
+                    key={index + 1}
+                    className={`pagination-btn ${currentPage === index + 1 ? 'active' : ''}`}
+                    onClick={() => handlePageChange(index + 1)}
+                  >
+                    {index + 1}
+                  </button>
+                ))}
+                
+                <button 
+                  className="pagination-btn" 
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPages}
+                >
+                  <ChevronRight size={18} />
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
 
       {/* Add New Inquiry Modal */}
       {isModalOpen && (
         <div className="modal-overlay" onClick={handleCloseModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>New Inquiry</h3>
+              <h3>{editingInquiry ? 'Edit Inquiry' : 'New Inquiry'}</h3>
               <button className="modal-close" onClick={handleCloseModal}>
                 <X size={20} />
               </button>
@@ -159,39 +320,65 @@ const Inquiries = () => {
             
             <form onSubmit={handleSubmit} className="modal-form">
               <div className="form-group">
-                <label htmlFor="customer">Customer Name *</label>
+                <label htmlFor="clientName">Client Name *</label>
                 <input
                   type="text"
-                  id="customer"
-                  name="customer"
-                  value={formData.customer}
+                  id="clientName"
+                  name="clientName"
+                  value={formData.clientName}
                   onChange={handleInputChange}
-                  placeholder="Enter customer name"
+                  placeholder="Enter client name"
                   required
                 />
               </div>
 
               <div className="form-group">
-                <label htmlFor="property">Property *</label>
+                <label htmlFor="contactNumber">Contact Number *</label>
                 <input
                   type="text"
-                  id="property"
-                  name="property"
-                  value={formData.property}
+                  id="contactNumber"
+                  name="contactNumber"
+                  value={formData.contactNumber}
                   onChange={handleInputChange}
-                  placeholder="Enter property name"
+                  placeholder="Enter contact number"
                   required
                 />
               </div>
 
               <div className="form-group">
-                <label htmlFor="message">Message *</label>
+                <label htmlFor="productType">Product Type *</label>
+                <input
+                  type="text"
+                  id="productType"
+                  name="productType"
+                  value={formData.productType}
+                  onChange={handleInputChange}
+                  placeholder="Enter product type"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="location">Location *</label>
+                <input
+                  type="text"
+                  id="location"
+                  name="location"
+                  value={formData.location}
+                  onChange={handleInputChange}
+                  placeholder="Enter location"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="majorComments">Comments *</label>
                 <textarea
-                  id="message"
-                  name="message"
-                  value={formData.message}
+                  id="majorComments"
+                  name="majorComments"
+                  value={formData.majorComments}
                   onChange={handleInputChange}
-                  placeholder="Enter inquiry message..."
+                  placeholder="Enter major comments..."
                   rows="4"
                   required
                   style={{
@@ -207,16 +394,16 @@ const Inquiries = () => {
               </div>
 
               <div className="form-group">
-                <label htmlFor="status">Status *</label>
+                <label htmlFor="caseStatus">Status *</label>
                 <select
-                  id="status"
-                  name="status"
-                  value={formData.status}
+                  id="caseStatus"
+                  name="caseStatus"
+                  value={formData.caseStatus}
                   onChange={handleInputChange}
                   required
                 >
                   <option value="New">New</option>
-                  <option value="Replied">Replied</option>
+                  <option value="In Progress">In Progress</option>
                   <option value="Closed">Closed</option>
                 </select>
               </div>
@@ -226,7 +413,7 @@ const Inquiries = () => {
                   Cancel
                 </button>
                 <button type="submit" className="btn-submit">
-                  Add Inquiry
+                  {editingInquiry ? 'Update Inquiry' : 'Add Inquiry'}
                 </button>
               </div>
             </form>
