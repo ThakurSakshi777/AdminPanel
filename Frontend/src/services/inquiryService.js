@@ -1,4 +1,4 @@
-// Inquiry Management Service for Admin Panel
+// Request Management Service for HRMS
 import axios from 'axios';
 
 const API_URL = '/api/inquiry';

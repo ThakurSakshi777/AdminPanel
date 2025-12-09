@@ -1,4 +1,4 @@
-// Listing Management Service for Admin Panel
+// Employee Management Service for HRMS
 import axios from 'axios';
 
 const API_URL = '/api';

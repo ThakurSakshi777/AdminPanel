@@ -1,4 +1,4 @@
-// Property Management Service for Admin Panel
+// Employee Data Management Service for HRMS
 import axios from 'axios';
 
 const API_URL = '/api';

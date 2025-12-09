@@ -10,8 +10,26 @@ import axios from "axios";
 
 dotenv.config();
 
+// Helper function to track HR activity
+const trackHRActivity = async (activityType, userId, email, name) => {
+  try {
+    const API_URL = process.env.API_URL || 'http://localhost:5000';
+    const endpoint = `${API_URL}/api/hr-activity/track-${activityType}`;
+    
+    const response = await axios.post(endpoint, {
+      userId,
+      email,
+      name,
+    });
 
-
+    console.log(`✅ HR ${activityType} tracked:`, response.data);
+    return response.data;
+  } catch (error) {
+    console.error(`⚠️ Failed to track HR ${activityType}:`, error.message);
+    // Don't fail the auth flow if tracking fails
+    return null;
+  }
+};
 
 let otpStore = {}; // temporary in-memory OTP store
 
@@ -137,7 +155,7 @@ export const verifyPhoneOtp = async (req, res) => {
 //  Step 5: Final Signup
 export const signup = async (req, res) => {
   try {
-    const { fullName, email, phone, state, city, street, pinCode, password } =
+    const { fullName, email, phone, state, city, street, pinCode, password, role, name } =
       req.body;
 
     const existingUser = await User.findOne({ email });
@@ -147,7 +165,7 @@ export const signup = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = new User({
-      fullName,
+      fullName: fullName || name,
       email,
       phone,
       state,
@@ -155,20 +173,45 @@ export const signup = async (req, res) => {
       street,
       pinCode,
       password: hashedPassword,
+      role: role || 'employee',
       isEmailVerified: true, //  after OTP flow
       isPhoneVerified: true,
+      isActive: true, // All new employees are active by default
     });
 
-    // await newUser.save();
     const savedUser = await newUser.save();
 
-    // const token = jwt.sign({ id: newUser._id }, "secret123", {
-    //   expiresIn: "1d",
-    // });
-  console.log("Saved user:", savedUser);
-    res.json({ success: true, user: newUser });
+    console.log("Saved user:", savedUser);
+    
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: savedUser._id, email: savedUser.email },
+      process.env.JWT_SECRET || "mysecretkey",
+      { expiresIn: "24h" }
+    );
+
+    // Track HR signup if user is HR
+    if (savedUser.role === 'hr') {
+      await trackHRActivity('signup', savedUser._id, savedUser.email, savedUser.fullName);
+    }
+
+    res.status(201).json({ 
+      success: true, 
+      message: 'Signup successful',
+      token,
+      data: {
+        _id: savedUser._id,
+        name: savedUser.fullName,
+        fullName: savedUser.fullName,
+        email: savedUser.email,
+        phone: savedUser.phone,
+        role: savedUser.role,
+        isActive: savedUser.isActive,
+      }
+    });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error("Signup error:", err);
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
@@ -207,7 +250,12 @@ export const loginUser = async (req, res) => {
       { expiresIn: "24h" }
     );
 
-    // 6 Send response
+    // 6 Track HR login if user is HR
+    if (user.role === 'hr') {
+      await trackHRActivity('login', user._id, user.email, user.fullName);
+    }
+
+    // 7 Send response
     res.status(200).json({
       message: "Login successful",
       token,
@@ -216,6 +264,7 @@ export const loginUser = async (req, res) => {
         fullName: user.fullName,
         email: user.email,
         phone: user.phone,
+        role: user.role,
         date: user.createdAt, // user registration date
         lastLogin: user.lastLogin, // recently added
       },

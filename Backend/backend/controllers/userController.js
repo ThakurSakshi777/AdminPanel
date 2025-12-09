@@ -285,6 +285,129 @@ export const updatePassword = async (req, res) => {
   }
 };
 
+// ==========================
+// Get Pending Employee Approvals
+// ==========================
+export const getPendingEmployees = async (req, res) => {
+  try {
+    // Fetch all employees with role 'employee' and isApproved = false
+    const pendingEmployees = await User.find({
+      role: 'employee',
+      isApproved: false
+    }).select('-password');
+
+    const count = pendingEmployees.length;
+
+    res.status(200).json({
+      success: true,
+      totalPending: count,
+      pendingEmployees,
+      message: `${count} employees pending approval`
+    });
+  } catch (error) {
+    console.error("Get Pending Employees Error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ==========================
+// Approve Employee
+// ==========================
+export const approveEmployee = async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const hrId = req.user?.id; // HR who approved
+
+    // Find the employee
+    const employee = await User.findById(employeeId);
+    if (!employee) {
+      return res.status(404).json({ success: false, message: "Employee not found" });
+    }
+
+    // Update approval status
+    employee.isApproved = true;
+    employee.approvedBy = hrId;
+    employee.approvedAt = new Date();
+
+    // Generate employee ID if not exists
+    if (!employee.employeeId) {
+      const count = await User.countDocuments({ role: 'employee', isApproved: true });
+      employee.employeeId = `EMP${String(count + 1).padStart(4, '0')}`;
+    }
+
+    await employee.save();
+
+    // TODO: Send email notification to employee about approval
+
+    res.status(200).json({
+      success: true,
+      message: `Employee ${employee.fullName} approved successfully`,
+      employee: employee.toObject()
+    });
+  } catch (error) {
+    console.error("Approve Employee Error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ==========================
+// Reject Employee
+// ==========================
+export const rejectEmployee = async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const { reason } = req.body;
+
+    // Find the employee
+    const employee = await User.findById(employeeId);
+    if (!employee) {
+      return res.status(404).json({ success: false, message: "Employee not found" });
+    }
+
+    // Update rejection status
+    employee.isApproved = false;
+    employee.rejectionReason = reason || 'Rejected by HR';
+
+    await employee.save();
+
+    // TODO: Send email notification to employee about rejection
+
+    res.status(200).json({
+      success: true,
+      message: `Employee ${employee.fullName} rejected`,
+      employee: employee.toObject()
+    });
+  } catch (error) {
+    console.error("Reject Employee Error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ==========================
+// Get All Approved Employees
+// ==========================
+export const getApprovedEmployees = async (req, res) => {
+  try {
+    // Fetch all approved employees with role 'employee'
+    const approvedEmployees = await User.find({
+      role: 'employee',
+      isApproved: true
+    }).select('-password');
+
+    const count = approvedEmployees.length;
+
+    res.status(200).json({
+      success: true,
+      totalApproved: count,
+      data: approvedEmployees,
+      message: `${count} approved employees`
+    });
+  } catch (error) {
+    console.error("Get Approved Employees Error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 
 
 

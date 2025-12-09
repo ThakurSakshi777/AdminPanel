@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock, User, UserPlus } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, UserPlus, Phone, Check, Users, ArrowRight } from 'lucide-react';
 import { registerUser } from '../services/authService';
+import { useAuth } from '../context/useAuth';
 
 const SignUp = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [userRole, setUserRole] = useState(null); // 'hr' or 'employee'
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -81,22 +84,62 @@ const SignUp = () => {
     setApiError('');
 
     try {
-      // Call register API
+      // Call register API with role
       const response = await registerUser({
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
         password: formData.password,
-        confirmPassword: formData.confirmPassword
+        confirmPassword: formData.confirmPassword,
+        role: userRole // Include role in signup
       });
 
-      // Show success message
-      if (response.message) {
-        alert(response.message); // Or use a toast notification
-      }
+      // Use AuthContext to login user after successful registration
+      if (response.token && response.user) {
+        login(response.user, userRole, response.token);
 
-      // Success - redirect to login page (since API doesn't return token on signup)
-      navigate('/login');
+        // Track HR signup if user is HR
+        if (userRole === 'hr') {
+          const userId = response.user?._id || response.user?.id || response.user?.userId;
+          const userName = response.user?.name || formData.name;
+          const userEmail = response.user?.email || formData.email;
+          
+          // Call HR activity tracking (non-blocking)
+          try {
+            const trackResponse = await fetch('/api/hr-activity/track-signup', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId,
+                email: userEmail,
+                name: userName
+              })
+            });
+            
+            if (trackResponse.ok) {
+              const trackData = await trackResponse.json();
+              console.log('✅ HR Signup tracked:', trackData);
+              // Save sessionId for logout tracking
+              if (trackData.data?.sessionId) {
+                localStorage.setItem('sessionId', trackData.data.sessionId);
+              }
+            }
+          } catch (trackError) {
+            console.warn('⚠️ HR activity tracking failed (non-blocking):', trackError);
+            // Don't block signup if tracking fails
+          }
+        }
+
+        // Redirect based on role
+        if (userRole === 'employee') {
+          navigate('/employee-dashboard');
+        } else {
+          navigate('/dashboard');
+        }
+      } else {
+        // If no token in response, redirect to login
+        navigate('/login');
+      }
     } catch (error) {
       setApiError(error.message || 'Registration failed. Please try again.');
       setIsLoading(false);
@@ -108,11 +151,85 @@ const SignUp = () => {
       <div className="auth-card">
         <div className="auth-header">
           <div className="auth-logo">🏢</div>
-          <h1>RentifyPro</h1>
-          <p>Create your account to get started.</p>
+          <h1>HRMS</h1>
+          <p>Create your account to manage your HR efficiently</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="auth-form">
+        {/* Role Selection - Show if no role selected */}
+        {!userRole ? (
+          <div className="role-selection">
+            <h2 className="role-selection-title">Select Your Role</h2>
+            <p className="role-selection-subtitle">Choose how you want to access the system</p>
+            
+            <div className="role-options-grid">
+              <button
+                type="button"
+                className="role-option hr-admin"
+                onClick={() => navigate('/hr-signup')}
+              >
+                <div className="role-option-icon hr-icon">
+                  <Users size={40} />
+                </div>
+                <h3 className="role-option-title">HR Administrator</h3>
+                <ul className="role-option-features">
+                  <li><Check size={16} /> Manage Employees</li>
+                  <li><Check size={16} /> Payroll & Salary</li>
+                  <li><Check size={16} /> Leave Management</li>
+                  <li><Check size={16} /> Reports & Analytics</li>
+                </ul>
+                <div className="role-option-cta">
+                  Choose Role <ArrowRight size={18} />
+                </div>
+              </button>
+
+              <button
+                type="button"
+                className="role-option employee"
+                onClick={() => setUserRole('employee')}
+              >
+                <div className="role-option-icon employee-icon">
+                  <User size={40} />
+                </div>
+                <h3 className="role-option-title">Employee</h3>
+                <ul className="role-option-features">
+                  <li><Check size={16} /> View Salary Slips</li>
+                  <li><Check size={16} /> Leave Requests</li>
+                  <li><Check size={16} /> Attendance Records</li>
+                  <li><Check size={16} /> Personal Info</li>
+                </ul>
+                <div className="role-option-cta">
+                  Choose Role <ArrowRight size={18} />
+                </div>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Registration Form - Show after role selection */}
+            <div className="role-display-header">
+              <div className="role-display">
+                <div className={`role-display-badge ${userRole}-badge`}>
+                  {userRole === 'hr' ? <Users size={18} /> : <User size={18} />}
+                </div>
+                <div className="role-display-info">
+                  <p className="role-display-label">Signing up as</p>
+                  <p className="role-display-name">{userRole === 'hr' ? 'HR Administrator' : 'Employee'}</p>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                className="role-change-btn"
+                onClick={() => {
+                  setUserRole(null);
+                  setFormData({ name: '', email: '', phone: '', password: '', confirmPassword: '' });
+                  setErrors({});
+                }}
+              >
+                Change
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="auth-form">
           {apiError && (
             <div className="auth-error-banner">
               {apiError}
@@ -156,7 +273,7 @@ const SignUp = () => {
           <div className="auth-form-group">
             <label htmlFor="phone">Mobile Number</label>
             <div className="auth-input-wrapper">
-              <User size={18} className="auth-input-icon" />
+              <Phone size={18} className="auth-input-icon" />
               <input
                 type="tel"
                 id="phone"
@@ -241,20 +358,22 @@ const SignUp = () => {
           </button>
         </form>
 
-        <div className="auth-footer">
-          <p>Already have an account? <Link to="/" className="auth-link">Login</Link></p>
-        </div>
+            <div className="auth-footer">
+              <p>Already have an account? <Link to="/login" className="auth-link">Login</Link></p>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="auth-illustration">
         <div className="auth-illustration-content">
-          <h2>Join RentifyPro Today</h2>
-          <p>Start managing your real estate business efficiently.</p>
+          <h2>Welcome to HRMS</h2>
+          <p>Join thousands managing their HR operations seamlessly.</p>
           <div className="auth-features">
-            <div className="auth-feature-item">✓ Easy Property Management</div>
-            <div className="auth-feature-item">✓ Real-time Analytics</div>
-            <div className="auth-feature-item">✓ Customer Relationship Tools</div>
-            <div className="auth-feature-item">✓ 24/7 Support</div>
+            <div className="auth-feature-item"><Check size={16} /> Employee Management</div>
+            <div className="auth-feature-item"><Check size={16} /> Payroll & Salary</div>
+            <div className="auth-feature-item"><Check size={16} /> Leave Management</div>
+            <div className="auth-feature-item"><Check size={16} /> 24/7 Support</div>
           </div>
         </div>
       </div>

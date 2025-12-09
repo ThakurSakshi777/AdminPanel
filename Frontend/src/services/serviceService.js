@@ -1,4 +1,4 @@
-// Service Management APIs for Admin Panel
+// HR Service Management APIs for HRMS
 import axios from 'axios';
 
 const API_URL = '/api/services';

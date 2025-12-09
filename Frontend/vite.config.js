@@ -7,23 +7,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://abc.ridealmobility.com',
-        changeOrigin: true,
-        secure: false,
-        configure: (proxy, options) => {
-          proxy.on('error', (err, req, res) => {
-            console.log('proxy error', err);
-          });
-          proxy.on('proxyReq', (proxyReq, req, res) => {
-            console.log('Sending Request:', req.method, req.url);
-          });
-          proxy.on('proxyRes', (proxyRes, req, res) => {
-            console.log('Response:', proxyRes.statusCode, req.url);
-          });
-        }
-      },
-      '/admin': {
-        target: 'http://abc.ridealmobility.com',
+        target: 'http://localhost:5000',
         changeOrigin: true,
         secure: false,
         configure: (proxy, options) => {

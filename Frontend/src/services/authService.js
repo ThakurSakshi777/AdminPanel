@@ -23,14 +23,15 @@ const getHeaders = () => {
 // Register new user (SignUp)
 export const registerUser = async (userData) => {
   try {
-    const response = await fetch(`${API_URL}/signup`, {
+    const response = await fetch(`${API_URL}/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        fullName: userData.name,
+        name: userData.name,
         email: userData.email,
-        mobileNumber: userData.phone || '',
-        password: userData.password
+        phone: userData.phone || '',
+        password: userData.password,
+        role: userData.role || 'employee' // Include role
       })
     });
 
@@ -40,19 +41,34 @@ export const registerUser = async (userData) => {
       throw new Error(data.message || 'Registration failed');
     }
 
-    // Save admin data to localStorage (API doesn't return token on signup)
-    if (data.admin) {
+    // Save user data to localStorage
+    if (data.data?.token || data.token) {
+      const token = data.data?.token || data.token || '';
+      const userRole = userData.role || 'employee';
+      const user = data.data || {};
+      
+      localStorage.setItem('authToken', token);
       localStorage.setItem('isAuthenticated', 'true');
-      localStorage.setItem('userName', data.admin.fullName);
-      localStorage.setItem('userEmail', data.admin.email);
-      localStorage.setItem('userId', data.admin.id);
-      localStorage.setItem('userRole', 'Admin');
-      if (data.admin.mobileNumber) {
-        localStorage.setItem('userPhone', data.admin.mobileNumber);
+      localStorage.setItem('userName', user.name || userData.name || '');
+      localStorage.setItem('userEmail', user.email || userData.email);
+      localStorage.setItem('userId', user._id || user.id || '');
+      localStorage.setItem('userRole', userRole);
+      
+      if (user.phone) {
+        localStorage.setItem('userPhone', user.phone);
       }
     }
 
-    return data;
+    // Return user data and token for AuthContext
+    return {
+      token: data.data?.token || data.token || '',
+      user: data.data || { 
+        email: userData.email,
+        name: userData.name,
+        role: userData.role || 'employee'
+      },
+      message: data.message
+    };
   } catch (error) {
     console.error('Register error:', error);
     throw error;
@@ -62,7 +78,7 @@ export const registerUser = async (userData) => {
 // Login user
 export const loginUser = async (credentials) => {
   try {
-    const response = await fetch(`${API_URL}/login`, {
+    const response = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -77,21 +93,35 @@ export const loginUser = async (credentials) => {
       throw new Error(data.message || 'Login failed');
     }
 
-    // Save token and admin data to localStorage
-    if (data.token) {
-      localStorage.setItem('authToken', data.token);
-      localStorage.setItem('isAuthenticated', 'true');
-      localStorage.setItem('userName', data.admin?.fullName || '');
-      localStorage.setItem('userEmail', data.admin?.email || credentials.email);
-      localStorage.setItem('userId', data.admin?.id || '');
-      localStorage.setItem('userRole', 'Admin');
+    // Save token and user data to localStorage
+    if (data.data?.token || data.token) {
+      const token = data.data?.token || data.token;
+      const user = data.data || {};
+      // IMPORTANT: Use the role from the backend (user.role), NOT from frontend selection
+      const userRole = user.role || 'employee';
       
-      if (data.admin?.mobileNumber) {
-        localStorage.setItem('userPhone', data.admin.mobileNumber);
+      localStorage.setItem('authToken', token);
+      localStorage.setItem('isAuthenticated', 'true');
+      localStorage.setItem('userName', user.name || '');
+      localStorage.setItem('userEmail', user.email || credentials.email);
+      localStorage.setItem('userId', user._id || user.id || '');
+      localStorage.setItem('userRole', userRole);
+      
+      if (user.phone) {
+        localStorage.setItem('userPhone', user.phone);
       }
     }
 
-    return data;
+    // Return user data and token for AuthContext
+    return {
+      token: data.data?.token || data.token || '',
+      user: data.data || { 
+        email: credentials.email,
+        name: '',
+        role: credentials.role || 'employee'
+      },
+      message: data.message
+    };
   } catch (error) {
     console.error('Login error:', error);
     throw error;
@@ -185,8 +215,49 @@ export const getCurrentUser = async () => {
   }
 };
 
+// Track HR Logout
+export const trackHRLogout = async (sessionId, token) => {
+  try {
+    if (!sessionId || !token) {
+      console.warn('⚠️ Session ID or token missing for logout tracking');
+      return;
+    }
+
+    const response = await fetch(`${API_URL}/hr-activity/track-logout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ sessionId })
+    });
+
+    const data = await response.json();
+    if (data.success) {
+      console.log('✅ HR Logout tracked:', data);
+    }
+  } catch (error) {
+    console.warn('⚠️ HR logout tracking failed:', error);
+    // Don't fail logout if tracking fails
+  }
+};
+
 // Logout user
-export const logoutUser = () => {
+export const logoutUser = async () => {
+  // Track HR logout if user is HR
+  try {
+    const userRole = localStorage.getItem('userRole');
+    const token = localStorage.getItem('authToken');
+    const sessionId = localStorage.getItem('sessionId');
+
+    if (userRole === 'hr' && token && sessionId) {
+      await trackHRLogout(sessionId, token);
+    }
+  } catch (error) {
+    console.warn('⚠️ Error tracking HR logout:', error);
+  }
+
+  // Clear all localStorage
   localStorage.removeItem('authToken');
   localStorage.removeItem('isAuthenticated');
   localStorage.removeItem('userName');
@@ -194,6 +265,7 @@ export const logoutUser = () => {
   localStorage.removeItem('userId');
   localStorage.removeItem('userRole');
   localStorage.removeItem('userPhone');
+  localStorage.removeItem('sessionId');
 };
 
 // Check if user is authenticated

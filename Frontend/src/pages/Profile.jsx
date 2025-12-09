@@ -1,20 +1,68 @@
-import { useState, useRef } from 'react';
-import { User, Mail, Phone, MapPin, Camera, Save, Edit2, Lock } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { User, Mail, Phone, MapPin, Camera, Save, Edit2, Lock, Briefcase, Calendar, Building } from 'lucide-react';
+import { getMyProfile, updateMyProfile } from '../services/hrService';
 
 const Profile = () => {
   const fileInputRef = useRef(null);
   const [isEditing, setIsEditing] = useState(false);
   const [profileImage, setProfileImage] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState(null);
   const [formData, setFormData] = useState({
-    name: localStorage.getItem('userName') || 'Admin User',
-    email: localStorage.getItem('userEmail') || 'admin@rentifypro.com',
-    phone: '+91 98765 43210',
-    address: 'Mumbai, Maharashtra',
-    role: 'Administrator',
-    bio: 'Real estate admin managing properties and customer relationships.',
-    company: 'RentifyPro',
-    joinDate: '2024-01-15'
+    name: '',
+    email: '',
+    phone: '',
+    department: '',
+    position: '',
+    role: '',
+    employeeId: '',
+    joinDate: '',
+    isActive: true
   });
+
+  // Load profile data on component mount
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    try {
+      setLoading(true);
+      
+      const profileData = await getMyProfile();
+      
+      // Format joinDate for date input (YYYY-MM-DD)
+      let formattedJoinDate = '';
+      if (profileData.joinDate) {
+        const date = new Date(profileData.joinDate);
+        formattedJoinDate = date.toISOString().split('T')[0];
+      }
+      
+      setFormData({
+        name: profileData.name || '',
+        email: profileData.email || '',
+        phone: profileData.phone || '',
+        department: profileData.department || '',
+        position: profileData.position || '',
+        role: profileData.role || 'employee',
+        employeeId: profileData.employeeId || '',
+        joinDate: formattedJoinDate,
+        isActive: profileData.isActive !== false
+      });
+    } catch (error) {
+      console.error('Error loading profile:', error);
+      // Set default values if API fails
+      const storedName = localStorage.getItem('userName') || 'User';
+      const storedEmail = localStorage.getItem('userEmail') || 'user@example.com';
+      setFormData(prev => ({
+        ...prev,
+        name: storedName,
+        email: storedEmail
+      }));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -39,14 +87,48 @@ const Profile = () => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Update localStorage
-    localStorage.setItem('userName', formData.name);
-    localStorage.setItem('userEmail', formData.email);
     
-    setIsEditing(false);
-    alert('Profile updated successfully!');
+    try {
+      const updateData = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        department: formData.department,
+        position: formData.position,
+        role: formData.role,
+        employeeId: formData.employeeId,
+        joinDate: formData.joinDate
+      };
+
+      const result = await updateMyProfile(updateData);
+      
+      if (result.success) {
+        // Update localStorage with all new data
+        localStorage.setItem('userName', formData.name);
+        localStorage.setItem('userEmail', formData.email);
+        localStorage.setItem('userPhone', formData.phone);
+        localStorage.setItem('userDepartment', formData.department);
+        localStorage.setItem('userPosition', formData.position);
+        localStorage.setItem('userRole', formData.role);
+        localStorage.setItem('employeeId', formData.employeeId);
+        localStorage.setItem('joinDate', formData.joinDate);
+        
+        setIsEditing(false);
+        alert('Profile updated successfully! The changes will reflect across the app.');
+        
+        // Reload the page to reflect changes everywhere
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      } else {
+        alert('Error updating profile: ' + result.message);
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      alert('Failed to update profile: ' + error.message);
+    }
   };
 
   return (
@@ -56,7 +138,12 @@ const Profile = () => {
         <p>Manage your account information and preferences</p>
       </div>
 
-      <div className="profile-content">
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          <p>Loading profile...</p>
+        </div>
+      ) : (
+        <div className="profile-content">
         {/* Profile Card */}
         <div className="profile-card">
           <div className="profile-card-header">
@@ -93,8 +180,11 @@ const Profile = () => {
             />
             <div className="profile-avatar-info">
               <h3>{formData.name}</h3>
-              <p>{formData.role}</p>
-              <span className="profile-badge">Active</span>
+              <p>{formData.role} - {formData.position}</p>
+              <div className="profile-hr-badges">
+                <span className="profile-badge">Active</span>
+                <span className="profile-badge hr-badge">🏢 {formData.department}</span>
+              </div>
             </div>
           </div>
 
@@ -146,13 +236,13 @@ const Profile = () => {
 
               <div className="profile-form-group">
                 <label>
-                  <MapPin size={18} />
-                  Address
+                  <Building size={18} />
+                  Department
                 </label>
                 <input
                   type="text"
-                  name="address"
-                  value={formData.address}
+                  name="department"
+                  value={formData.department}
                   onChange={handleInputChange}
                   disabled={!isEditing}
                 />
@@ -160,13 +250,13 @@ const Profile = () => {
 
               <div className="profile-form-group">
                 <label>
-                  <User size={18} />
-                  Company
+                  <Briefcase size={18} />
+                  Position
                 </label>
                 <input
                   type="text"
-                  name="company"
-                  value={formData.company}
+                  name="position"
+                  value={formData.position}
                   onChange={handleInputChange}
                   disabled={!isEditing}
                 />
@@ -177,25 +267,43 @@ const Profile = () => {
                   <Lock size={18} />
                   Role
                 </label>
-                <input
-                  type="text"
+                <select
                   name="role"
                   value={formData.role}
-                  disabled
+                  onChange={handleInputChange}
+                  disabled={!isEditing}
+                >
+                  <option value="employee">Employee</option>
+                  <option value="hr">HR</option>
+                  <option value="tl">Team Lead</option>
+                </select>
+              </div>
+
+              <div className="profile-form-group">
+                <label>
+                  <User size={18} />
+                  Employee ID
+                </label>
+                <input
+                  type="text"
+                  name="employeeId"
+                  value={formData.employeeId}
+                  onChange={handleInputChange}
+                  disabled={!isEditing}
                 />
               </div>
 
-              <div className="profile-form-group full-width">
+              <div className="profile-form-group">
                 <label>
-                  <Edit2 size={18} />
-                  Bio
+                  <Calendar size={18} />
+                  Join Date
                 </label>
-                <textarea
-                  name="bio"
-                  value={formData.bio}
+                <input
+                  type="date"
+                  name="joinDate"
+                  value={formData.joinDate}
                   onChange={handleInputChange}
                   disabled={!isEditing}
-                  rows="4"
                 />
               </div>
             </div>
@@ -210,70 +318,8 @@ const Profile = () => {
             )}
           </form>
         </div>
-
-        {/* Account Stats */}
-        <div className="profile-stats-grid">
-          <div className="profile-stat-card">
-            <div className="stat-icon">📊</div>
-            <div className="stat-content">
-              <h4>Total Properties</h4>
-              <p className="stat-value">156</p>
-            </div>
-          </div>
-
-          <div className="profile-stat-card">
-            <div className="stat-icon">👥</div>
-            <div className="stat-content">
-              <h4>Total Users</h4>
-              <p className="stat-value">1,234</p>
-            </div>
-          </div>
-
-          <div className="profile-stat-card">
-            <div className="stat-icon">📝</div>
-            <div className="stat-content">
-              <h4>Active Inquiries</h4>
-              <p className="stat-value">89</p>
-            </div>
-          </div>
-
-          <div className="profile-stat-card">
-            <div className="stat-icon">📅</div>
-            <div className="stat-content">
-              <h4>Member Since</h4>
-              <p className="stat-value">Jan 2024</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Security Section */}
-        <div className="profile-security-card">
-          <h2>Security Settings</h2>
-          <div className="security-items">
-            <div className="security-item">
-              <div className="security-item-info">
-                <Lock size={20} />
-                <div>
-                  <h4>Password</h4>
-                  <p>Last changed 30 days ago</p>
-                </div>
-              </div>
-              <button className="btn-change">Change Password</button>
-            </div>
-
-            <div className="security-item">
-              <div className="security-item-info">
-                <Mail size={20} />
-                <div>
-                  <h4>Email Verification</h4>
-                  <p>Your email is verified</p>
-                </div>
-              </div>
-              <span className="verified-badge">✓ Verified</span>
-            </div>
-          </div>
-        </div>
       </div>
+      )}
     </div>
   );
 };

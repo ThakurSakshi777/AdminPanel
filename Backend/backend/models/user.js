@@ -40,6 +40,22 @@ const userSchema = new mongoose.Schema(
       enum: ["manual", "google"],
       default: "manual",
     },
+
+    // Employee-specific fields
+    role: { type: String, enum: ["employee", "hr", "manager"], default: "employee" },
+    position: { type: String, default: "" },
+    department: { type: String, default: "" },
+    employeeId: { type: String, unique: true, sparse: true },
+    joinDate: { type: Date, default: null },
+    salary: { type: Number, default: 0 },
+    team: { type: String, default: "" },
+    teamLeader: { type: String, default: "" },
+    
+    // Approval status for employee signup
+    isApproved: { type: Boolean, default: false },
+    approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    approvedAt: { type: Date, default: null },
+    rejectionReason: { type: String, default: "" },
   },
   { timestamps: true }
 );
@@ -63,4 +79,5 @@ userSchema.pre("save", function (next) {
 });
 
 export default mongoose.model("User", userSchema);
+
 

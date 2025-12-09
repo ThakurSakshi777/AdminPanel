@@ -1,4 +1,4 @@
-// Security Management APIs for Admin Panel
+// Security Management APIs for HRMS
 import axios from 'axios';
 
 // Get authentication token from localStorage

@@ -23,8 +23,10 @@ import sellRoute from "./routes/sellRoute.js";
 import rentRoute from "./routes/rentRoute.js";
 import revenueRoute from "./routes/revenueRoute.js";
 import userRoute from "./routes/userRoute.js";
+import employeeRoute from "./routes/employeeRoute.js";
 import changePasswordRoute from "./routes/changePasswordRoute.js";
 import adminAuthRoute from "./routes/adminAuthRoute.js";
+import hrAuthRoute from "./routes/hrAuthRoute.js";
 import paymentRoute from "./routes/paymentRoute.js"
 import inquiryRoute from "./routes/inquiryRoute.js"; 
 import reminderRoute from "./routes/reminderRoute.js";
@@ -87,7 +89,8 @@ app.use((req, res, next) => {
 
 
 //  API Routes
-app.use("/auth", router);
+app.use("/api/auth", router);
+app.use("/api/hr-auth", hrAuthRoute);
 app.use("/property", addRouter);
 app.use("/api/properties", getRoute);
 app.use("/api/properties", recentRoute);
@@ -96,10 +99,11 @@ app.use("/api/services", serviceRoutes);
 app.use("/api/properties", boughtRoute);
 app.use("/api/chat", chatRouter);
 app.use("/api/users", editRoutes);
+app.use("/api/users", userRoute);
+app.use("/api/employees", employeeRoute);
 app.use("/api/properties", sellRoute);
 app.use("/api/properties", rentRoute);
 app.use("/api/properties", revenueRoute);
-app.use("/api/users", userRoute);
 app.use("/api", changePasswordRoute);
 app.use("/admin", adminAuthRoute);
 app.use("/api/payment", paymentRoute);
